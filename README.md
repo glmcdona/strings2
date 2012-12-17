@@ -55,5 +55,6 @@ From the command prompt:
 
 ## Contributing
 Contributions are welcome. Some possible contribution directions are as follows:
+* Only print unique strings.
 * Add flag support for dumping process strings by process/window title matching.
 * Add x64 assembly support for extracting ASM stack pushed strings.
