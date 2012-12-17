@@ -1,5 +1,5 @@
 # strings2
-Strings2 is a Windows command-line tool for extracting strings from binary data. On top of the classical Sysinternals strings approach, this improved version is also able to dump strings from process address spaces and also reconstructs hidden assembly local variable assignment ascii/unicode strings. Currently, the ASM-string extracting approach only supports the x86 instruction set.
+Strings2 is a Windows 32bit and 64bit command-line tool for extracting strings from binary data. On top of the classical Sysinternals strings approach, this improved version is also able to dump strings from process address spaces and also reconstructs hidden assembly local variable assignment ascii/unicode strings. Currently, the ASM-string extracting approach only supports the x86 instruction set.
 
 I am maintaining a public binary release download page for this project at:
   http://split-code.com/strings2.html
