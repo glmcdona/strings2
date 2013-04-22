@@ -10,8 +10,8 @@
 			>
 			<DebugSettings
 				Command="$(TargetPath)"
-				WorkingDirectory="C:\Users\glmcdona\Documents\hazard\0612\"
-				CommandArguments="*"
+				WorkingDirectory="C:\Users\glmcdona\Documents\"
+				CommandArguments="*.bin"
 				Attach="false"
 				DebuggerType="3"
 				Remote="1"
@@ -66,8 +66,8 @@
 			>
 			<DebugSettings
 				Command="$(TargetPath)"
-				WorkingDirectory=""
-				CommandArguments=""
+				WorkingDirectory="C:\\Windows\\"
+				CommandArguments="-r *.dll &gt; tmp.txt"
 				Attach="false"
 				DebuggerType="3"
 				Remote="1"
@@ -78,7 +78,7 @@
 				SQLDebugging=""
 				Environment=""
 				EnvironmentMerge="true"
-				DebuggerFlavor=""
+				DebuggerFlavor="0"
 				MPIRunCommand=""
 				MPIRunArguments=""
 				MPIRunWorkingDirectory=""

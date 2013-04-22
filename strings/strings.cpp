@@ -71,47 +71,55 @@ void processFolder( char* dir_name, WCHAR* filter, bool recursively, string_pars
 		while ((ent = readdir (dir)) != NULL) {
 			// Convert the path to wchar format
 			wchar_t* result = new wchar_t[ent->d_namlen + 1];
-			for( int i = 0; i < ent->d_namlen; i++ )
-				result[i] = ent->d_name[i];
-			result[ent->d_namlen] = 0;
 
-			if( (ent->d_type & DT_DIR) )
+			if( result != NULL )
 			{
-				// Process this subdirectory if recursive flag is on
-				if( recursively && wcscmp(result, L".") != 0 && wcscmp(result, L"..") != 0  )
+				for( int i = 0; i < ent->d_namlen; i++ )
+					result[i] = ent->d_name[i];
+				result[ent->d_namlen] = 0;
+
+				if( (ent->d_type & DT_DIR) )
 				{
-					// Build the directory path
-					char* directory = new char[0x101];
-					sprintf(directory, "%s/%s", dir_name, ent->d_name);
-
-					processFolder( directory, filter, recursively, parser );
-
-					// Cleanup
-					delete[] directory;
-				}
-			}else{
-				// Check if this filename is a match to the specified pattern
-				if( PathMatchSpec( result, filter ) )
-				{
-					// Process this file
-					int length = wcslen(result) + strlen(dir_name);
-					char* filename = new char[length + 1];
-					filename[length] = 0;
-					sprintf( filename, "%s/%S", dir_name, result );
-
-					// Processes the specified file for strings
-					FILE* fh = fopen( filename, "rb" );
-					if( fh != NULL )
+					// Process this subdirectory if recursive flag is on
+					if( recursively && wcscmp(result, L".") != 0 && wcscmp(result, L"..") != 0  )
 					{
-						parser->parse_stream(fh, filename);
-						fclose(fh);
-					}else{
-						// Error
-						fprintf(stderr, "Error opening file %s: %s.\n", filename, strerror(errno));
+						// Build the directory path
+						char* directory = new char[0x101];
+						sprintf(directory, "%s/%s", dir_name, ent->d_name);
+
+						processFolder( directory, filter, recursively, parser );
+
+						// Cleanup
+						delete[] directory;
+					}
+				}else{
+					// Check if this filename is a match to the specified pattern
+					if( PathMatchSpec( result, filter ) )
+					{
+						// Process this file
+						int length = wcslen(result) + strlen(dir_name) + 1;
+						char* filename = new char[length + 1];
+						filename[length] = 0;
+						sprintf( filename, "%s/%S", dir_name, result );
+
+						// Processes the specified file for strings
+						FILE* fh = fopen( filename, "rb" );
+						if( fh != NULL )
+						{
+							parser->parse_stream(fh, filename);
+							fclose(fh);
+						}else{
+							// Error
+							fprintf(stderr, "Error opening file %s: %s.\n", filename, strerror(errno));
+						}
 					}
 				}
+				delete[] result;
 			}
-			delete[] result;
+			else
+			{
+				fprintf(stderr, "Failed to allocate memory block of size %i for filename: %s.\n", ent->d_namlen + 1, strerror(errno));
+			}
 		}
 		closedir (dir);
 	}else{
@@ -162,6 +170,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	bool flagPrintType = false;
 	bool flagAsmOnly = false;
 	bool flagRawOnly = false;
+	bool flagAsciiOnly = false;
+	bool flagUnicodeOnly = false;
 	bool pipedInput = !_isatty( _fileno( stdin ) );
 	bool flagPidDump = false;
 	bool flagSystemDump = false;
@@ -192,6 +202,10 @@ int _tmain(int argc, _TCHAR* argv[])
 			flagPidDump = true;
 		else if( lstrcmp(argv[i],L"-system") == 0 )
 			flagSystemDump = true;
+		else if( lstrcmp(argv[i],L"-a") == 0 )
+			flagAsciiOnly = true;
+		else if( lstrcmp(argv[i],L"-u") == 0 )
+			flagUnicodeOnly = true;
 		else if( lstrcmp(argv[i],L"-l") == 0 )
 		{
 			if(  i + 1 < argc )
@@ -227,6 +241,11 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	// Fill out the options structure based on the flags
 	STRING_OPTIONS options;
+	options.printUniqueGlobal = false;
+	options.printUniqueLocal = false;
+
+	options.printAsciiOnly = false;
+	options.printUnicodeOnly = false;
 	options.printNormal = false;
 	options.printASM = false;
 	if( flagAsmOnly )
@@ -238,6 +257,19 @@ int _tmain(int argc, _TCHAR* argv[])
 		options.printASM = true;
 		options.printNormal = true;
 	}
+	
+	if( flagAsciiOnly && flagUnicodeOnly )
+	{
+		fprintf(stderr,"Warning. Default conditions extract both unicode and ascii strings. There is no need to use both '-a' and '-u' flags at the same time.\n");
+	}else{
+		if( flagAsciiOnly )
+			options.printAsciiOnly = true;
+		if( flagUnicodeOnly )
+			options.printUnicodeOnly = true;
+	}
+	
+
+
 	options.printType = flagPrintType;
 	options.printFile = flagFile;
 	options.minCharacters = minCharacters;
@@ -245,7 +277,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	// Print copyright header
 	if( flagHeader )
 	{
-		printf("Strings2 v1.1\n");
+		printf("Strings2 v1.2\n");
 		printf("  Copyright © 2012, Geoff McDonald\n");
 		printf("  http://www.split-code.com/\n\n");
 	}
@@ -270,6 +302,8 @@ int _tmain(int argc, _TCHAR* argv[])
 		printf(" -t\n\tPrints the type before each string. Unicode,\n\tascii, or assembly unicode/ascii stack push.\n");
 		printf(" -asm\n\tOnly prints the extracted ascii/unicode\n\tassembly stack push-hidden strings.\n");
 		printf(" -raw\n\tOnly prints the regular ascii/unicode strings.\n");
+		printf(" -a\n\tPrints only ascii strings.\n");
+		printf(" -u\n\tPrints only unicode strings.\n");
 		printf(" -l [numchars]\n\tMinimum number of characters that is\n\ta valid string. Default is 4.\n");
 		printf(" -nh\n\tNo header is printed in the output.\n");
 		//printf(" -process\n\tUses the filename filter as a process-name filter instead. The matching processes will have all their strings dumped.\n");
@@ -296,7 +330,6 @@ int _tmain(int argc, _TCHAR* argv[])
 			if( flagPidDump )
 			{
 				// Extract all strings from the specified process
-
 				if( filter != NULL )
 				{
 					// Check the prefix

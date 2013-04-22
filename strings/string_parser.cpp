@@ -51,7 +51,7 @@ int string_parser::extractImmediate( char* immediate, int immediateSize, STRING_
 	return 0;
 }
 
-int string_parser::extractString( unsigned char* buffer, long bufferSize, long offset, unsigned char* outputString, int outputStringSize, int &outputStringLength, EXTRACT_TYPE & extractType)
+int string_parser::extractString( unsigned char* buffer, long bufferSize, long offset, unsigned char* outputString, int outputStringSize, int &outputStringLength, EXTRACT_TYPE & extractType, STRING_TYPE & stringType)
 {
 	// Process the string as either:
 	// 1. ascii
@@ -74,7 +74,6 @@ int string_parser::extractString( unsigned char* buffer, long bufferSize, long o
 	// C7 85     mov dword [ebp+imm32], imm32
 
 	// Set unknown string type
-	STRING_TYPE stringType = TYPE_UNDETERMINED;
 	extractType = EXTRACT_RAW;
 	outputStringLength = 0;
 	int i = 0;
@@ -260,6 +259,7 @@ int string_parser::extractString( unsigned char* buffer, long bufferSize, long o
 						i+=2;
 					}
 					outputStringLength = i / 2;
+					stringType = TYPE_UNICODE;
 					return i;
 				}else
 				{
@@ -273,6 +273,7 @@ int string_parser::extractString( unsigned char* buffer, long bufferSize, long o
 
 					// Copy this string to the output
 					memcpy( outputString, buffer + offset, outputStringLength );
+					stringType = TYPE_ASCII;
 					return outputStringLength;
 				}
 			}
@@ -294,7 +295,8 @@ bool string_parser::processContents( unsigned char* filecontents, long bufferSiz
 	while( offset + options.minCharacters < bufferSize )
 	{
 		// Process this offset
-		int stringDiskSpace = extractString( filecontents, bufferSize, offset, outputString, MAX_STRING_SIZE, outputStringSize, extractType );
+		STRING_TYPE stringType = TYPE_UNDETERMINED;
+		int stringDiskSpace = extractString( filecontents, bufferSize, offset, outputString, MAX_STRING_SIZE, outputStringSize, extractType, stringType );
 
 		if( outputStringSize >= options.minCharacters )
 		{
@@ -308,6 +310,11 @@ bool string_parser::processContents( unsigned char* filecontents, long bufferSiz
 				print = true;
 			else if( options.printASM && extractType == EXTRACT_ASM )
 				print = true;
+
+			if( options.printUnicodeOnly && stringType != TYPE_UNICODE )
+				print = false;
+			if( options.printAsciiOnly && stringType != TYPE_ASCII )
+				print = false;
 
 			if( print )
 			{
@@ -337,16 +344,32 @@ bool string_parser::processContents( unsigned char* filecontents, long bufferSiz
 					i++;
 				}*/
 
-				if( options.printType && options.printFile )
+				string tmpString( (char*) outputString, outputStringSize);
+				if( (!options.printUniqueLocal && !options.printUniqueGlobal)/* ||
+					!hashes.Contains( tmpString )*/ )
 				{
-					printer->addStrings((char*)filename, ",", (extractType == EXTRACT_RAW ? "RAW: " : "ASM: "), (char*)outputString, "\n");
+					// Add this string has as necessary
+					/*
+					if( options.printUniqueGlobal )
+						hashes.Global_Insert( tmpString );
+					else if( options.printUniqueLocal )
+						hashes.Local_Insert( tmpString );
+					*/
+
+					if( options.printType && options.printFile )
+					{
+						printer->addStrings((char*)filename, ",", (extractType == EXTRACT_RAW ? (stringType == TYPE_UNICODE ? "UNICODE: " : (stringType == TYPE_ASCII ? "ASCII: " : "UNDETERMINED: ")) : "ASM: "), (char*)outputString, "\n");
+					}
+					else if( options.printType )
+						printer->addStrings((extractType == EXTRACT_RAW ? (stringType == TYPE_UNICODE ? "UNICODE: " : (stringType == TYPE_ASCII ? "ASCII: " : "UNDETERMINED: ")) : "ASM: "), (char*)outputString, "\n");
+					else if( options.printFile )
+						printer->addStrings((char*)filename, ": ", (char*)outputString, "\n");
+					else
+						printer->addStrings((char*)outputString, "\n");
 				}
-				else if( options.printType )
-					printer->addStrings((extractType == EXTRACT_RAW ? "RAW: " : "ASM: "), (char*)outputString, "\n");
-				else if( options.printFile )
-					printer->addStrings((char*)filename, ": ", (char*)outputString, "\n");
-				else
-					printer->addStrings((char*)outputString, "\n");
+
+
+				
 			}
 
 			// Advance the offset
@@ -374,7 +397,7 @@ bool string_parser::parse_block(unsigned char* buffer, unsigned int buffer_lengt
 
 string_parser::string_parser(STRING_OPTIONS options)
 {
-	printer = new print_buffer(0x1000000);
+	printer = new print_buffer(0x100000);
 	this->options = options;
 }
 

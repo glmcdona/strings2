@@ -3,6 +3,8 @@
 #include "windows.h"
 #include "DynArray.h"
 #include "print_buffer.h"
+#include "string_hashes.h"
+
 using namespace std;
 
 #define MAX_STRING_SIZE 0x2000
@@ -31,10 +33,14 @@ static bool isAscii[0x100] =
 
 struct STRING_OPTIONS
 {
+	bool printAsciiOnly;
+	bool printUnicodeOnly;
 	bool printFile;
 	bool printType;
 	bool printNormal;
 	bool printASM;
+	bool printUniqueLocal;
+	bool printUniqueGlobal;
 	int minCharacters;
 };
 
@@ -56,9 +62,10 @@ class string_parser
 	
 	STRING_OPTIONS options;
 	print_buffer* printer;
+	
 
 	int extractImmediate( char* immediate, int immediateSize, STRING_TYPE &stringType, unsigned char* outputString );
-	int extractString( unsigned char*  buffer, long bufferSize, long offset, unsigned char* outputString, int outputStringSize, int &outputStringLength, EXTRACT_TYPE &extractType);
+	int extractString( unsigned char*  buffer, long bufferSize, long offset, unsigned char* outputString, int outputStringSize, int &outputStringLength, EXTRACT_TYPE &extractType, STRING_TYPE & stringType);
 	bool processContents( unsigned char* buffer, long numRead, LPCSTR filepath );
 public:
 	string_parser( STRING_OPTIONS options );
