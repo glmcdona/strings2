@@ -41,6 +41,7 @@ struct STRING_OPTIONS
 	bool printASM;
 	bool printUniqueLocal;
 	bool printUniqueGlobal;
+	bool escapeNewLines;
 	int minCharacters;
 };
 

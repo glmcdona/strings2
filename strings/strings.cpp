@@ -5,7 +5,7 @@
 #include "string_parser.h"
 #include "windows.h"
 #include <sys/types.h>
-#include <dirent.h>
+#include "dirent.h"
 #include <errno.h>
 #include <vector>
 #include <string>
@@ -84,8 +84,8 @@ void processFolder( char* dir_name, WCHAR* filter, bool recursively, string_pars
 					if( recursively && wcscmp(result, L".") != 0 && wcscmp(result, L"..") != 0  )
 					{
 						// Build the directory path
-						char* directory = new char[0x101];
-						sprintf(directory, "%s/%s", dir_name, ent->d_name);
+						char* directory = new char[MAX_PATH+1];
+						sprintf_s(directory, MAX_PATH+1, "%s/%s", dir_name, ent->d_name);
 
 						processFolder( directory, filter, recursively, parser );
 
@@ -100,7 +100,7 @@ void processFolder( char* dir_name, WCHAR* filter, bool recursively, string_pars
 						int length = wcslen(result) + strlen(dir_name) + 1;
 						char* filename = new char[length + 1];
 						filename[length] = 0;
-						sprintf( filename, "%s/%S", dir_name, result );
+						sprintf_s( filename, length+1, "%s/%S", dir_name, result );
 
 						// Processes the specified file for strings
 						FILE* fh = fopen( filename, "rb" );
@@ -112,6 +112,8 @@ void processFolder( char* dir_name, WCHAR* filter, bool recursively, string_pars
 							// Error
 							fprintf(stderr, "Error opening file %s: %s.\n", filename, strerror(errno));
 						}
+
+						delete[] filename;
 					}
 				}
 				delete[] result;
@@ -176,6 +178,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	bool flagPidDump = false;
 	bool flagSystemDump = false;
 	bool flagRecursive = false;
+	bool flagEscape = false;
 	int minCharacters = 4;
 
 	if( argc <= 1 && !pipedInput )
@@ -206,6 +209,8 @@ int _tmain(int argc, _TCHAR* argv[])
 			flagAsciiOnly = true;
 		else if( lstrcmp(argv[i],L"-u") == 0 )
 			flagUnicodeOnly = true;
+		else if( lstrcmp(argv[i],L"-e") == 0 )
+			flagEscape = true;
 		else if( lstrcmp(argv[i],L"-l") == 0 )
 		{
 			if(  i + 1 < argc )
@@ -248,6 +253,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	options.printUnicodeOnly = false;
 	options.printNormal = false;
 	options.printASM = false;
+	options.escapeNewLines = flagEscape;
 	if( flagAsmOnly )
 		options.printASM = true;
 	if( flagRawOnly )
@@ -277,8 +283,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	// Print copyright header
 	if( flagHeader )
 	{
-		printf("Strings2 v1.2\n");
-		printf("  Copyright © 2012, Geoff McDonald\n");
+		printf("Strings2 v1.3\n");
+		printf("  Copyright © 2016, Geoff McDonald\n");
 		printf("  http://www.split-code.com/\n\n");
 	}
 
@@ -309,6 +315,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		//printf(" -process\n\tUses the filename filter as a process-name filter instead. The matching processes will have all their strings dumped.\n");
 		printf(" -pid\n\tThe strings from the process address space for the\n\tspecified PID will be dumped. Use a '0x' prefix to\n\tspecify a hex PID.\n");
 		printf(" -system\n\tDumps strings from all accessible processes on the\n\tsystem. This takes awhile.\n");
+		printf(" -e\n\tEscape \\r and \\n characters.\n");
 	}else{
 		// Create the string parser object
 		string_parser* parser = new string_parser(options);
@@ -389,8 +396,24 @@ int _tmain(int argc, _TCHAR* argv[])
 			}
 		}else if(filter != NULL)
 		{
+			// Split the filter into the directory and filename filter halves
+			char path[MAX_PATH+1] = {'.',0};
+			wchar_t* last_slash = wcsrchr( filter, '\\' );
+			if( last_slash == NULL || wcsrchr( filter, '/' ) > last_slash )
+				last_slash = wcsrchr( filter, '/' );
+			
+			if( last_slash != NULL )
+			{
+				// Copy the path
+				sprintf_s( path, MAX_PATH+1, "%S", filter );
+				path[ last_slash - filter] = 0;
+
+				// Move the filter
+				memmove(filter, last_slash + 1, (wcslen(last_slash+1)+1)*2);
+			}
+
 			// Process the specified files
-			processFolder( ".", filter, flagRecursive, parser );
+			processFolder( path, filter, flagRecursive, parser );
 		}
 		
 		// Cleanup the string parser

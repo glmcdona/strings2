@@ -318,31 +318,31 @@ bool string_parser::processContents( unsigned char* filecontents, long bufferSiz
 
 			if( print )
 			{
-				// I commented the this region because the default behaviour should not escape these characters.
-				// TODO: Add flag switch for this.
-
-				// Replace \n with "\n" and \r with "\r"
-				/*
-				int i = 0;
-				while( i < outputStringSize && i + 1 < MAX_STRING_SIZE )
+				// Replace \n with "\\n" and \r with "\\r"
+				if( options.escapeNewLines )
 				{
-					if( outputString[i] == '\n' )
+					int i = 0;
+					while( i < outputStringSize && outputStringSize + 2 < MAX_STRING_SIZE )
 					{
-						// Replace with "\\n"
-						memmove(outputString+i+2, outputString+i+1, (outputStringSize + 2) - i);
-						outputString[i] = '\\';
-						outputString[i+1] = 'n';
-						outputStringSize++;
-					}else if( outputString[i] == '\r' )
-					{
-						// Replace with "\\r"
-						memmove(outputString+i+2, outputString+i+1, (outputStringSize + 2) - i);
-						outputString[i] = '\\';
-						outputString[i+1] = 'r';
-						outputStringSize++;
+						if( outputString[i] == '\n' )
+						{
+							// Replace with "\\n"
+							// "\n\x00" to "\\n\x00"
+							memmove(outputString+i+2, outputString+i+1, (outputStringSize) - i);
+							outputString[i] = '\\';
+							outputString[i+1] = 'n';
+							outputStringSize++;
+						}else if( outputString[i] == '\r' )
+						{
+							// Replace with "\\r"
+							memmove(outputString+i+2, outputString+i+1, (outputStringSize) - i);
+							outputString[i] = '\\';
+							outputString[i+1] = 'r';
+							outputStringSize++;
+						}
+						i++;
 					}
-					i++;
-				}*/
+				}
 
 				string tmpString( (char*) outputString, outputStringSize);
 				if( (!options.printUniqueLocal && !options.printUniqueGlobal)/* ||
