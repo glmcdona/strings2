@@ -1,5 +1,6 @@
 #include "StdAfx.h"
 #include "string_parser.h"
+#include <errno.h>
 
 int string_parser::extractImmediate( char* immediate, int immediateSize, STRING_TYPE &stringType, unsigned char* outputString )
 {
