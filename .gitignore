@@ -12,7 +12,8 @@
 [Rr]elease/
 
 build/
-
+lib/
+.vs/
 
 [Tt]est[Rr]esult
 [Bb]uild[Ll]og.*

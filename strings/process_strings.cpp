@@ -3,10 +3,10 @@
 
 bool IsWin64(HANDLE process)
 {
-    BOOL retVal;
-	if( IsWow64Process(process, &retVal) )
+    BOOL ret_val;
+	if( IsWow64Process(process, &ret_val) )
 	{
-		return retVal;
+		return ret_val;
 	}
 	PrintLastError(L"IsWow64Process");
 	return false;
@@ -15,28 +15,28 @@ bool IsWin64(HANDLE process)
 bool process_strings::dump_system()
 {
 	// Enumerate processes, and process the strings from each one
-	HANDLE hSnapShot=CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,0);
+	HANDLE h_snapshot=CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,0);
 	
-	if( hSnapShot != INVALID_HANDLE_VALUE )
+	if( h_snapshot != INVALID_HANDLE_VALUE )
 	{
 		// Handle the first i_process
-		PROCESSENTRY32 tmpProcess;
-		tmpProcess.dwSize = sizeof(PROCESSENTRY32);
+		PROCESSENTRY32 tmp_p;
+		tmp_p.dwSize = sizeof(PROCESSENTRY32);
 		int result;
-		if( (result = Process32First(hSnapShot, &tmpProcess)) )
+		if( (result = Process32First(h_snapshot, &tmp_p)) )
 		{
 			if( result == TRUE )
-				dump_process(tmpProcess.th32ProcessID);
+				dump_process(tmp_p.th32ProcessID);
 
-			while( (result = Process32Next(hSnapShot, &tmpProcess)) )
+			while( (result = Process32Next(h_snapshot, &tmp_p)) )
 			{
 				if( result == TRUE )
-					dump_process(tmpProcess.th32ProcessID);
+					dump_process(tmp_p.th32ProcessID);
 			}
 		}
 
 		// Cleanup the handle
-		CloseHandle( hSnapShot );
+		CloseHandle( h_snapshot );
 		return true;
 	}
 	return false;
@@ -62,11 +62,11 @@ bool process_strings::dump_process(DWORD pid)
 		HANDLE hSnapshot=CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, pid);
 		if ( hSnapshot != INVALID_HANDLE_VALUE )
 		{
-			this->generateModuleList(hSnapshot);
+			this->_generate_module_list(hSnapshot);
 			CloseHandle(hSnapshot);
 			
 			// Walk through the process heaps, extracting the strings
-			bool result = this->processAllHeaps(ph, process_name);
+			bool result = this->_process_all_memory(ph, process_name);
 
 			free(process_name);
 			return result;
@@ -85,48 +85,48 @@ bool process_strings::dump_process(DWORD pid)
 
 process_strings::process_strings(string_parser* parser)
 {
-	this->parser = parser;
+	this->m_parser = parser;
 }
 
 
-bool process_strings::processAllHeaps(HANDLE ph, char* process_name)
+bool process_strings::_process_all_memory(HANDLE ph, char* process_name)
 {
 	// Set the max address of the target process. Assume it is a 64 bit process.
-	__int64 maxAddress = 0;
-	maxAddress = 0x7ffffffffff;
+	__int64 max_address = 0;
+	max_address = 0x7ffffffffff;
 
     // Walk the process heaps
     __int64 address = 0;
     MEMORY_BASIC_INFORMATION mbi;
 	
-    while (address < maxAddress)
+    while (address < max_address)
     {
-        // Load this heap information
-        __int64 blockSize = VirtualQueryEx(ph, (LPCVOID) address, (_MEMORY_BASIC_INFORMATION*) &mbi, sizeof(_MEMORY_BASIC_INFORMATION64));
-		__int64 newAddress = (__int64)mbi.BaseAddress + (__int64)mbi.RegionSize + (__int64)1;
-		if( newAddress <= address )
+        // Load this region information
+        __int64 block_size = VirtualQueryEx(ph, (LPCVOID) address, (_MEMORY_BASIC_INFORMATION*) &mbi, sizeof(_MEMORY_BASIC_INFORMATION64));
+		__int64 new_address = (__int64)mbi.BaseAddress + (__int64)mbi.RegionSize + (__int64)1;
+		if( new_address <= address )
 			break;
-		address = newAddress;
+		address = new_address;
 
 		if( mbi.State == MEM_COMMIT && !(mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD)) )
 		{
-			// Process this heap
+			// Process this region
 
-			// Read in the heap
+			// Read in the region
 			unsigned char* buffer = new unsigned char[mbi.RegionSize];
 			if( buffer != NULL )
 			{
-				__int64 numRead = 0;
-				bool result = ReadProcessMemory(ph, (LPCVOID) mbi.BaseAddress, buffer, mbi.RegionSize,(SIZE_T*) &numRead);
+				__int64 num_read = 0;
+				bool result = ReadProcessMemory(ph, (LPCVOID) mbi.BaseAddress, buffer, mbi.RegionSize,(SIZE_T*) &num_read);
 
 				//fprintf(stderr,"Current address: %016llX\n",mbi.BaseAddress);
-				if( numRead > 0 )
+				if( num_read > 0 )
 				{
-					if( numRead != (unsigned int) mbi.RegionSize )
-						fprintf(stderr,"Failed read full heap from address 0x%016llX: %s. Only %i of expected %i bytes were read.\n", mbi.BaseAddress, strerror(errno), numRead, mbi.RegionSize);
+					if( num_read != (unsigned int) mbi.RegionSize )
+						fprintf(stderr,"Failed read full region from address 0x%016llX: %s. Only %i of expected %i bytes were read.\n", mbi.BaseAddress, strerror(errno), num_read, mbi.RegionSize);
 
-					// Print the strings from this heap
-					parser->parse_block( buffer, numRead, process_name);
+					// Print the strings from this region
+					m_parser->parse_block( buffer, num_read, process_name);
 				}else if( !result ){
 					fprintf(stderr,"Failed to read from address 0x%016llX. ", mbi.BaseAddress);
 					PrintLastError(L"ReadProcessMemory");
@@ -135,7 +135,7 @@ bool process_strings::processAllHeaps(HANDLE ph, char* process_name)
 				// Cleanup
 				free(buffer);
 			}else{
-				fprintf(stderr,"Failed to allocate space of %x for reading in a heap.", mbi.RegionSize);
+				fprintf(stderr,"Failed to allocate space of %x for reading in a region.", mbi.RegionSize);
 			}
 		}
     }
@@ -143,21 +143,21 @@ bool process_strings::processAllHeaps(HANDLE ph, char* process_name)
 	return true;
 }
 
-void process_strings::generateModuleList(HANDLE hSnapshot)
+void process_strings::_generate_module_list(HANDLE hSnapshot)
 {
-	MODULEENTRY32 tmpModule;
-	tmpModule.dwSize = sizeof(MODULEENTRY32);
-	if( Module32First(hSnapshot, &tmpModule) )
+	MODULEENTRY32 tmp_m;
+	tmp_m.dwSize = sizeof(MODULEENTRY32);
+	if( Module32First(hSnapshot, &tmp_m) )
 	{
 		// Add this i_module to our array
-		tmpModule.dwSize = sizeof(MODULEENTRY32);
-		modules.Add(new module(tmpModule));
+		tmp_m.dwSize = sizeof(MODULEENTRY32);
+		m_modules.push_back(module(tmp_m));
 
-		while(Module32Next(hSnapshot,&tmpModule))
+		while(Module32Next(hSnapshot,&tmp_m))
 		{
 			// Add this i_module to our array
-			modules.Add(new module(tmpModule));
-			tmpModule.dwSize = sizeof(MODULEENTRY32);
+			m_modules.push_back(module(tmp_m));
+			tmp_m.dwSize = sizeof(MODULEENTRY32);
 		}
 	}
 }

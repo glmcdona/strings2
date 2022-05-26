@@ -19,7 +19,7 @@
 using namespace std;
 
 
-BOOL Is64BitWindows()
+BOOL is_win64()
 {
 	#if defined(_WIN64)
 		return TRUE;  // 64-bit programs run only on Win64
@@ -33,7 +33,7 @@ BOOL Is64BitWindows()
 	#endif
 }
 
-bool isElevated(HANDLE h_Process)
+bool is_elevated(HANDLE h_Process)
 {
 	HANDLE h_Token;
 	TOKEN_ELEVATION t_TokenElevation;
@@ -60,7 +60,7 @@ bool isElevated(HANDLE h_Process)
     return false;
 }
 
-void processFolder( char* dir_name, WCHAR* filter, bool recursively, string_parser* parser )
+void process_folder( char* dir_name, WCHAR* filter, bool recursively, string_parser* parser )
 {
 	DIR *dir;
 	struct dirent *ent;
@@ -87,7 +87,7 @@ void processFolder( char* dir_name, WCHAR* filter, bool recursively, string_pars
 						char* directory = new char[MAX_PATH+1];
 						sprintf_s(directory, MAX_PATH+1, "%s/%s", dir_name, ent->d_name);
 
-						processFolder( directory, filter, recursively, parser );
+						process_folder( directory, filter, recursively, parser );
 
 						// Cleanup
 						delete[] directory;
@@ -130,7 +130,7 @@ void processFolder( char* dir_name, WCHAR* filter, bool recursively, string_pars
 }
 
 
-bool getMaximumPrivileges(HANDLE h_Process)
+bool get_privileges(HANDLE h_Process)
 {
 	HANDLE h_Token;
 	DWORD dw_TokenLength;
@@ -165,52 +165,70 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	// Process the flags	
 	WCHAR* filter = NULL;
-	bool flagHelp = false;
-	bool flagHeader = true;
-	bool flagFile = false;
-	bool flagFilePath = false;
-	bool flagPrintType = false;
-	bool flagAsmOnly = false;
-	bool flagRawOnly = false;
-	bool flagAsciiOnly = false;
-	bool flagUnicodeOnly = false;
-	bool pipedInput = !_isatty( _fileno( stdin ) );
-	bool flagPidDump = false;
-	bool flagSystemDump = false;
-	bool flagRecursive = false;
-	bool flagEscape = false;
+	bool flag_help = false;
+	bool flag_filename = false;
+	bool flag_filepath = false;
+	bool flag_utf8_only = false;
+	bool flag_wide_string_only = false;
+	bool piped_input = !_isatty( _fileno( stdin ) );
+	bool flag_dump_pid = false;
+	bool flag_dump_system = false;
+	bool flag_recursive = false;
+	bool flag_all_strings = false;
+	bool flag_strings_interesting = true;
+	bool flag_strings_not_interesting = false;
+	bool flag_print_string_type = false;
+	bool flag_print_json = false;
+	WCHAR* flag_json_file = NULL;
 	int minCharacters = 4;
 
-	if( argc <= 1 && !pipedInput )
-		flagHelp = true;
+	if( argc <= 1 && !piped_input )
+		flag_help = true;
 	for( int i = 1; i < argc; i++ )
 	{
-		if( lstrcmp(argv[i],L"--help") == 0 || lstrcmp(argv[i],L"-help") == 0 || lstrcmp(argv[i],L"-h") == 0 || lstrcmp(argv[i],L"--h") == 0)
-			flagHelp = true;
-		else if( lstrcmp(argv[i],L"-f") == 0 )
-			flagFile = true;
-		//else if( lstrcmp(argv[i],L"-ff") == 0 )
-		//	flagFilePath = true;
-		else if( lstrcmp(argv[i],L"-t") == 0 )
-			flagPrintType = true;
-		else if( lstrcmp(argv[i],L"-r") == 0 )
-			flagRecursive = true;
-		else if( lstrcmp(argv[i],L"-nh") == 0 )
-			flagHeader = false;
-		else if( lstrcmp(argv[i],L"-asm") == 0 )
-			flagAsmOnly = true;
-		else if( lstrcmp(argv[i],L"-raw") == 0 )
-			flagRawOnly = true;
+		if (lstrcmp(argv[i], L"--help") == 0 || lstrcmp(argv[i], L"-help") == 0 || lstrcmp(argv[i], L"-h") == 0 || lstrcmp(argv[i], L"--h") == 0)
+			flag_help = true;
+		else if (lstrcmp(argv[i], L"-f") == 0)
+			flag_filename = true;
+		else if (lstrcmp(argv[i], L"-F") == 0)
+			flag_filepath = true;
+		else if (lstrcmp(argv[i], L"-r") == 0)
+			flag_recursive = true;
+		else if (lstrcmp(argv[i], L"-t") == 0)
+			flag_print_string_type = true;
+		else if (lstrcmp(argv[i], L"-json") == 0)
+		{
+			flag_print_json = true;
+
+			if (i + 1 < argc)
+			{
+				flag_json_file = argv[i+1];
+			}
+			else {
+				fprintf(stderr, "Failed to parse -json argument. It must be followed by a file:\n\teg. 'strings2 *.exe -json result.json'\n");
+				exit(0);
+			}
+		}
+		else if (lstrcmp(argv[i], L"-a") == 0)
+		{
+			// Both interesting and not interesting
+			flag_strings_interesting = true;
+			flag_strings_not_interesting = true;
+		}
+		else if (lstrcmp(argv[i], L"-ni") == 0)
+		{
+			// Only not interesting
+			flag_strings_interesting = false;
+			flag_strings_not_interesting = true;
+		}
+		else if(lstrcmp(argv[i], L"-u") == 0 || lstrcmp(argv[i],L"-utf8") == 0 )
+			flag_utf8_only = true;
+		else if(lstrcmp(argv[i], L"-w") == 0 || lstrcmp(argv[i],L"-wide") == 0 )
+			flag_wide_string_only = true;
 		else if( lstrcmp(argv[i],L"-pid") == 0 )
-			flagPidDump = true;
+			flag_dump_pid = true;
 		else if( lstrcmp(argv[i],L"-system") == 0 )
-			flagSystemDump = true;
-		else if( lstrcmp(argv[i],L"-a") == 0 )
-			flagAsciiOnly = true;
-		else if( lstrcmp(argv[i],L"-u") == 0 )
-			flagUnicodeOnly = true;
-		else if( lstrcmp(argv[i],L"-e") == 0 )
-			flagEscape = true;
+			flag_dump_system = true;
 		else if( lstrcmp(argv[i],L"-l") == 0 )
 		{
 			if(  i + 1 < argc )
@@ -226,7 +244,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				}
 				i++;
 			}else{
-				fprintf(stderr,"Failed to parse -l argument. It must be preceeded by a number:\n\teg. 'strings2 *.exe -l 6'\n");
+				fprintf(stderr,"Failed to parse -l argument. It must be followed by a number:\n\teg. 'strings2 *.exe -l 6'\n");
 				exit(0);
 			}
 		}else{
@@ -246,95 +264,70 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	// Fill out the options structure based on the flags
 	STRING_OPTIONS options;
-	options.printUniqueGlobal = false;
-	options.printUniqueLocal = false;
 
-	options.printAsciiOnly = false;
-	options.printUnicodeOnly = false;
-	options.printNormal = false;
-	options.printASM = false;
-	options.escapeNewLines = flagEscape;
-	if( flagAsmOnly )
-		options.printASM = true;
-	if( flagRawOnly )
-		options.printNormal = true;
-	if( !flagAsmOnly && !flagRawOnly )
+	options.min_chars = minCharacters;
+
+	options.print_utf8 = flag_utf8_only || !flag_wide_string_only;
+	options.print_wide_string = flag_wide_string_only || !flag_utf8_only;
+
+	options.print_interesting = flag_strings_interesting;
+	options.print_not_interesting = flag_strings_not_interesting;
+
+	options.print_string_type = flag_print_string_type;
+	options.print_filename = flag_filename;
+	options.print_filepath = flag_filepath;
+
+	options.json_file_output = wstring(L"");
+	if (flag_json_file != NULL)
 	{
-		options.printASM = true;
-		options.printNormal = true;
+		options.json_file_output = wstring(flag_json_file);
 	}
 	
-	if( flagAsciiOnly && flagUnicodeOnly )
-	{
-		fprintf(stderr,"Warning. Default conditions extract both unicode and ascii strings. There is no need to use both '-a' and '-u' flags at the same time.\n");
-	}else{
-		if( flagAsciiOnly )
-			options.printAsciiOnly = true;
-		if( flagUnicodeOnly )
-			options.printUnicodeOnly = true;
-	}
 	
 
-
-	options.printType = flagPrintType;
-	options.printFile = flagFile;
-	options.minCharacters = minCharacters;
-
-	// Print copyright header
-	if( flagHeader )
-	{
-		printf("Strings2 v1.3\n");
-		printf("  Copyright © 2016, Geoff McDonald\n");
-		printf("  http://www.split-code.com/\n\n");
-	}
-
-	if( flagHelp )
+	if( flag_help )
 	{
 		// Print help page
-		printf("Strings2 is an improved version of the Sysinternals strings tool that extracts all unicode/ascii strings from binary data. On top of the classical strings approach, this improved version is able to dump strings from process address spaces and also reconstructs assembly local variable assignment ascii/unicode strings.\n\n");
+		printf("Strings2 is an improved version of the Sysinternals strings tool that extracts all unicode/ascii strings from binary data. On top of the classical strings approach, this version decodes multilingual strings (eg Chinese, Russian, etc) and uses a ML model to suppress noisy uninteresting strings.\n\n");
 		printf("Example Usage:\n");
 		printf("\tstrings2 malware.exe\n");
 		printf("\tstrings2 *.exe > strings.txt\n");
-		printf("\tstrings2 *.exe -nh -f -t -asm > strings.txt\n");
 		printf("\tstrings2 -pid 419 > process_strings.txt\n");
 		printf("\tstrings2 -pid 0x1a3 > process_strings.txt\n");
 		printf("\tstrings2 -system > all_process_strings.txt\n");
 		printf("\tcat abcd.exe | strings2 > out.txt\n\n");
-		//printf("strings2 -process *notepad*");
 		printf("Flags:\n");
-		printf(" -f\n\tPrints the filename/processname before each string.\n");
 		printf(" -r\n\tRecursively process subdirectories.\n");
-		//printf(" -ff\n\tPrints the path\\filename before each string.\n");
-		printf(" -t\n\tPrints the type before each string. Unicode,\n\tascii, or assembly unicode/ascii stack push.\n");
-		printf(" -asm\n\tOnly prints the extracted ascii/unicode\n\tassembly stack push-hidden strings.\n");
-		printf(" -raw\n\tOnly prints the regular ascii/unicode strings.\n");
-		printf(" -a\n\tPrints only ascii strings.\n");
-		printf(" -u\n\tPrints only unicode strings.\n");
+		printf(" -f\n\tPrints the filename/processname before each string.\n");
+		printf(" -F\n\tPrints the full path and filename before each string.\n");
+		printf(" -t\n\tPrints the string type before each string. UTF8,\n\tor WIDE_STRING.\n");
+		printf(" -u\n\tPrints only WIDE_STRING strings that are encoded\n\tas two bytes per character.\n");
+		printf(" -y\n\tPrints only UTF8 decoded strings.\n");
+		printf(" -a\n\tPrints all strings including not interesting strings.\n");
+		printf(" -ni\n\tPrints only not interesting strings.\n");
 		printf(" -l [numchars]\n\tMinimum number of characters that is\n\ta valid string. Default is 4.\n");
-		printf(" -nh\n\tNo header is printed in the output.\n");
-		//printf(" -process\n\tUses the filename filter as a process-name filter instead. The matching processes will have all their strings dumped.\n");
 		printf(" -pid\n\tThe strings from the process address space for the\n\tspecified PID will be dumped. Use a '0x' prefix to\n\tspecify a hex PID.\n");
 		printf(" -system\n\tDumps strings from all accessible processes on the\n\tsystem. This takes awhile.\n");
-		printf(" -e\n\tEscape \\r and \\n characters.\n");
+		printf(" -json [file]\n\tWrites output to the specified json file.\n");
 	}else{
 		// Create the string parser object
 		string_parser* parser = new string_parser(options);
 
-		if (flagPidDump || flagSystemDump)
+		if (flag_dump_pid || flag_dump_system)
 		{
 			// Warn if running in 32 bit mode on a 64 bit OS
-			if( Is64BitWindows() && sizeof(void*) == 4 )
+			if( is_win64() && sizeof(void*) == 4 )
 			{
 				fprintf(stderr, "WARNING: To properly dump address spaces of 64-bit processes the 64-bit version of strings2 should be used. Currently strings2 has been detected as running as a 32bit process under a 64bit operating system.\n\n");
 			}
 
 			// Elevate strings2 to the maximum privilges
-			getMaximumPrivileges( GetCurrentProcess() );
+			get_privileges( GetCurrentProcess() );
 
 			// Create a process string dump class
 			process_strings* process = new process_strings(parser);
 
-			if( flagPidDump )
+			if( flag_dump_pid )
 			{
 				// Extract all strings from the specified process
 				if( filter != NULL )
@@ -369,14 +362,14 @@ int _tmain(int argc, _TCHAR* argv[])
 				}else{
 					fwprintf(stderr, L"Error. No PID was specified. Example usage:\n\tstrings2 -pid 419 > process_strings.txt\n", filter);
 				}
-			}else if( flagSystemDump )
+			}else if( flag_dump_system )
 			{
 				// Extract strings from the whole system
 				process->dump_system();
 			}
 
 			delete process;
-		}else if (pipedInput)
+		}else if (piped_input)
 		{
 			// Set "stdin" to have binary mode:
 			int result = _setmode( _fileno( stdin ), _O_BINARY );
@@ -413,7 +406,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			}
 
 			// Process the specified files
-			processFolder( path, filter, flagRecursive, parser );
+			process_folder( path, filter, flag_recursive, parser );
 		}
 		
 		// Cleanup the string parser

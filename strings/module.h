@@ -7,7 +7,7 @@
 
 class module
 {
-	MODULEENTRY32W moduleDetails;
+	MODULEENTRY32W m_module_details;
 public:
 	bool contains(unsigned int address);
 
