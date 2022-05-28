@@ -2,7 +2,8 @@
 #pragma once
 #include <string>
 #include <codecvt>
-#include <string_model.h>
+#include "string_model.h"
+#include <unordered_set>
 
 using namespace std;
 

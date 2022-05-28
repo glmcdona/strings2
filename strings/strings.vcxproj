@@ -22,6 +22,7 @@
     <ProjectGuid>{12872240-F930-4859-8FE1-16ED68B57411}</ProjectGuid>
     <RootNamespace>strings</RootNamespace>
     <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
@@ -136,6 +137,8 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Link>
       <AdditionalDependencies>Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -171,6 +174,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="basics.cpp" />
+    <ClCompile Include="binary2strings.cpp" />
     <ClCompile Include="module.cpp" />
     <ClCompile Include="print_buffer.cpp" />
     <ClCompile Include="process_strings.cpp" />
@@ -188,6 +192,7 @@
     <ClInclude Include="binary2strings.hpp" />
     <ClInclude Include="dirent.h" />
     <ClInclude Include="extracted_string.hpp" />
+    <ClInclude Include="json.hpp" />
     <ClInclude Include="module.h" />
     <ClInclude Include="print_buffer.h" />
     <ClInclude Include="process_strings.h" />

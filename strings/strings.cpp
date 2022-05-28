@@ -1,6 +1,6 @@
 // strings.cpp : Defines the entry point for the console application.
 //
-
+#pragma once
 #include "stdafx.h"
 #include "string_parser.h"
 #include "windows.h"
@@ -15,9 +15,14 @@
 #include <io.h>
 #include <fcntl.h>
 #include "process_strings.h"
+#include <string>
+#include <filesystem>
+#define _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING
+#include <experimental/filesystem>
+
 
 using namespace std;
-
+using namespace std::filesystem;
 
 BOOL is_win64()
 {
@@ -60,17 +65,17 @@ bool is_elevated(HANDLE h_Process)
     return false;
 }
 
-void process_folder( char* dir_name, WCHAR* filter, bool recursively, string_parser* parser )
+void process_folder( string dir_name, string filter, bool recursively, string_parser* parser )
 {
 	DIR *dir;
 	struct dirent *ent;
-	dir = opendir (dir_name);
+	dir = opendir (dir_name.c_str());
 	if (dir != NULL)
 	{
 		/* print all the files and directories within directory */
 		while ((ent = readdir (dir)) != NULL) {
 			// Convert the path to wchar format
-			wchar_t* result = new wchar_t[ent->d_namlen + 1];
+			char* result = new char[ent->d_namlen + 1];
 
 			if( result != NULL )
 			{
@@ -81,39 +86,29 @@ void process_folder( char* dir_name, WCHAR* filter, bool recursively, string_par
 				if( (ent->d_type & DT_DIR) )
 				{
 					// Process this subdirectory if recursive flag is on
-					if( recursively && wcscmp(result, L".") != 0 && wcscmp(result, L"..") != 0  )
+					if( recursively && strcmp(result, ".") != 0 && strcmp(result, "..") != 0  )
 					{
 						// Build the directory path
-						char* directory = new char[MAX_PATH+1];
-						sprintf_s(directory, MAX_PATH+1, "%s/%s", dir_name, ent->d_name);
-
-						process_folder( directory, filter, recursively, parser );
-
-						// Cleanup
-						delete[] directory;
+						string next_directory = dir_name + "/" + string(ent->d_name);
+						process_folder( next_directory, filter, recursively, parser );
 					}
 				}else{
 					// Check if this filename is a match to the specified pattern
-					if( PathMatchSpec( result, filter ) )
+					if( PathMatchSpecA( result, filter.c_str() ) )
 					{
 						// Process this file
-						int length = wcslen(result) + strlen(dir_name) + 1;
-						char* filename = new char[length + 1];
-						filename[length] = 0;
-						sprintf_s( filename, length+1, "%s/%S", dir_name, result );
+						string filepath = dir_name + "/" + string(result);
 
 						// Processes the specified file for strings
-						FILE* fh = fopen( filename, "rb" );
+						FILE* fh = fopen( filepath.c_str(), "rb" );
 						if( fh != NULL )
 						{
-							parser->parse_stream(fh, filename);
+							parser->parse_stream(fh, string(result), filepath);
 							fclose(fh);
 						}else{
 							// Error
-							fprintf(stderr, "Error opening file %s: %s.\n", filename, strerror(errno));
+							fprintf(stderr, "Error opening file %s: %s.\n", filepath, strerror(errno));
 						}
-
-						delete[] filename;
 					}
 				}
 				delete[] result;
@@ -333,7 +328,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				if( filter != NULL )
 				{
 					// Check the prefix
-					bool isHex = false;
+					bool is_hex = false;
 					wchar_t* prefix = new wchar_t[3];
 					memcpy(prefix, filter, 4);
 					prefix[2] = 0;
@@ -341,21 +336,19 @@ int _tmain(int argc, _TCHAR* argv[])
 					if( wcscmp(prefix, L"0x") == 0 )
 					{
 						filter = &filter[2];
-						isHex = true;
+						is_hex = true;
 					}
 					delete[] prefix;
 					
 					// Extract the pid from the string
-					unsigned int PID;
-					if( (isHex && swscanf(filter, L"%x", &PID) > 0) ||
-						(!isHex && swscanf(filter, L"%i", &PID) > 0))
+					unsigned int pid;
+					if( (is_hex && swscanf(filter, L"%x", &pid) > 0) ||
+						(!is_hex && swscanf(filter, L"%i", &pid) > 0))
 					{
 						// Successfully parsed the PID
 						
 						// Parse the process
-						process->dump_process(PID);
-
-						
+						process->dump_process(pid);
 					}else{
 						fwprintf(stderr, L"Failed to parse filter argument as a valid PID: %s.\n", filter);
 					}
@@ -381,7 +374,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			if( fh != NULL )
 			{
 				// Process the piped input
-				parser->parse_stream(fh, "piped data");
+				parser->parse_stream(fh, "piped data", "piped data");
 				fclose(fh);
 			}else{
 				// Error
@@ -389,24 +382,24 @@ int _tmain(int argc, _TCHAR* argv[])
 			}
 		}else if(filter != NULL)
 		{
-			// Split the filter into the directory and filename filter halves
-			char path[MAX_PATH+1] = {'.',0};
-			wchar_t* last_slash = wcsrchr( filter, '\\' );
-			if( last_slash == NULL || wcsrchr( filter, '/' ) > last_slash )
-				last_slash = wcsrchr( filter, '/' );
-			
-			if( last_slash != NULL )
-			{
-				// Copy the path
-				sprintf_s( path, MAX_PATH+1, "%S", filter );
-				path[ last_slash - filter] = 0;
+			// Convert filter to string
+			std::wstring ws = filter;
+			std::string f(ws.begin(), ws.end());
 
-				// Move the filter
-				memmove(filter, last_slash + 1, (wcslen(last_slash+1)+1)*2);
+			// Split the filter into the directory and filename filter halves
+			filesystem::path p(f);
+			
+			if( p.has_filename() || p.has_parent_path() )
+			{
+				// Process the specified files
+				process_folder( p.parent_path().string(), p.filename().string(), flag_recursive, parser);
+			}
+			else
+			{
+				fprintf(stderr, "Not a valid filter '%S'.", filter);
 			}
 
-			// Process the specified files
-			process_folder( path, filter, flag_recursive, parser );
+			
 		}
 		
 		// Cleanup the string parser

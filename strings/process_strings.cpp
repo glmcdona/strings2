@@ -8,7 +8,7 @@ bool IsWin64(HANDLE process)
 	{
 		return ret_val;
 	}
-	PrintLastError(L"IsWow64Process");
+	PrintLastError((LPTSTR) "IsWow64Process");
 	return false;
 }
 
@@ -72,14 +72,14 @@ bool process_strings::dump_process(DWORD pid)
 			return result;
 		}else{
 			fprintf(stderr,"Failed gather module information for process 0x%x (%i). ", pid, pid);
-			PrintLastError(L"dump_process");
+			PrintLastError((LPTSTR) "dump_process");
 		}
 
 		free(process_name);
 		return false;
 	}else{
 		fprintf(stderr,"Failed open process 0x%x (%i). ", pid, pid);
-		PrintLastError(L"dump_process");
+		PrintLastError((LPTSTR) "dump_process");
 	}
 }
 
@@ -89,7 +89,7 @@ process_strings::process_strings(string_parser* parser)
 }
 
 
-bool process_strings::_process_all_memory(HANDLE ph, char* process_name)
+bool process_strings::_process_all_memory(HANDLE ph, string process_name)
 {
 	// Set the max address of the target process. Assume it is a 64 bit process.
 	__int64 max_address = 0;
@@ -126,10 +126,12 @@ bool process_strings::_process_all_memory(HANDLE ph, char* process_name)
 						fprintf(stderr,"Failed read full region from address 0x%016llX: %s. Only %i of expected %i bytes were read.\n", mbi.BaseAddress, strerror(errno), num_read, mbi.RegionSize);
 
 					// Print the strings from this region
-					m_parser->parse_block( buffer, num_read, process_name);
+					std::stringstream stream;
+					stream << "0x" << std::hex << mbi.BaseAddress;
+					m_parser->parse_block( buffer, num_read, process_name, stream.str() );
 				}else if( !result ){
 					fprintf(stderr,"Failed to read from address 0x%016llX. ", mbi.BaseAddress);
-					PrintLastError(L"ReadProcessMemory");
+					PrintLastError((LPTSTR) "ReadProcessMemory");
 				}
 
 				// Cleanup

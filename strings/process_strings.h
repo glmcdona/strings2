@@ -6,6 +6,9 @@
 #include <Psapi.h>
 #include <vector>
 #include "basics.h"
+#include <string>
+#include <sstream>
+
 #pragma comment(lib, "Psapi")
 using namespace std;
 
@@ -15,10 +18,11 @@ class process_strings
 	string_parser* m_parser;
 
 	void _generate_module_list(HANDLE hSnapshot);
-	bool _process_all_memory(HANDLE ph, char* process_name);
+	bool _process_all_memory(HANDLE ph, string process_name);
 public:
 	process_strings(string_parser* parser);
 	bool dump_process(DWORD pid);
 	bool dump_system();
+
 	~process_strings(void);
 };

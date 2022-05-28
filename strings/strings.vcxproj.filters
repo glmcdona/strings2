@@ -36,6 +36,9 @@
     <ClCompile Include="strings.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="binary2strings.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="basics.h">
@@ -65,10 +68,13 @@
     <ClInclude Include="binary2strings.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="string_model.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="extracted_string.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="string_model.h">
+    <ClInclude Include="json.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

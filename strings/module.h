@@ -3,7 +3,6 @@
 #include <tlhelp32.h>
 #include <iostream>	
 #include <string>
-#include "DynArray.h"
 
 class module
 {

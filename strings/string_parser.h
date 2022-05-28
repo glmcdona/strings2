@@ -3,11 +3,13 @@
 #include "windows.h"
 #include "print_buffer.h"
 #include "binary2strings.hpp"
+#include "json.hpp"
+#include <errno.h>
 
 using namespace std;
 
 constexpr auto MAX_STRING_SIZE = 0x2000;
-constexpr auto BLOCK_SIZE = 0x50000;
+constexpr auto BLOCK_SIZE = 1e+8; // 100MB
 
 struct STRING_OPTIONS
 {
@@ -44,7 +46,7 @@ class string_parser
 	
 public:
 	string_parser( STRING_OPTIONS options );
-	bool parse_block( unsigned char* buffer, unsigned int buffer_length, string data_source );
-	bool parse_stream( FILE* fh, string data_source );
+	bool parse_block( unsigned char* buffer, unsigned int buffer_length, string name_short, string name_long );
+	bool parse_stream( FILE* fh, string name_short, string name_long);
 	~string_parser(void);
 };

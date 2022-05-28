@@ -1,13 +1,56 @@
 #include "StdAfx.h"
 #include "string_parser.h"
-#include <errno.h>
 
-bool string_parser::parse_block(unsigned char* buffer, unsigned int buffer_length, string data_source)
+using namespace nlohmann;
+
+bool string_parser::parse_block(unsigned char* buffer, unsigned int buffer_length, string name_short, string name_long)
 {
 	if( buffer != NULL && buffer_length > 0)
 	{
 		// Process this buffer
-		return this->processContents( buffer, buffer_length, data_source);
+		vector<std::tuple<string, string, std::pair<int, int>, bool>> r_vect = extract_all_strings(buffer, buffer_length, this->m_options.min_chars, !this->m_options.print_not_interesting);
+
+		
+		if (m_options.json_file_output.length() > 0)
+		{
+			// Output the strings to a json file
+			json j;
+			j["name_short"] = name_short;
+			j["name_long"] = name_long;
+			for (int i = 0; i < r_vect.size(); i++)
+			{
+				j["strings"][i]["string"] = std::get<0>(r_vect[i]);
+				j["strings"][i]["type"] = std::get<1>(r_vect[i]);
+				j["strings"][i]["span"] = { std::get<2>( r_vect[i]).first, std::get<2>(r_vect[i]).second };
+				j["strings"][i]["is_interesting"] = std::get<3>(r_vect[i]);
+			}
+			this->m_printer->add_json_string(j.dump());
+		}
+		else
+		{
+			// Iterate through the resulting strings, printing them
+			for (int i = 0; i < r_vect.size(); i++)
+			{
+				// Add the prefixes as appropriate
+				if (m_options.print_filepath)
+					this->m_printer->add_string(name_short + ",");
+
+				if (m_options.print_filename)
+					this->m_printer->add_string(name_long + ",");
+
+				if (m_options.print_string_type)
+					this->m_printer->add_string(std::get<1>(r_vect[i]));
+
+				if (m_options.print_span)
+				{
+					string span = "(" + to_string(std::get<2>(r_vect[i]).first) + "," + to_string(std::get<2>(r_vect[i]).second) + ")" + ",";
+					this->m_printer->add_string(span);
+				}
+
+				this->m_printer->add_string(std::get<0>(r_vect[i]) + "\n");
+			}
+		}
+		
 	}
 	return false;
 }
@@ -18,13 +61,14 @@ string_parser::string_parser(STRING_OPTIONS options)
 	this->m_options = options;
 }
 
-bool string_parser::parse_stream(FILE* fh, string data_source)
+bool string_parser::parse_stream(FILE* fh, string name_short, string name_long)
 {
 	if( fh != NULL )
 	{
 		
 		unsigned char* buffer;
-		int numRead;
+		int num_read;
+		long long offset = 0;
 
 		// Allocate the buffer
 		buffer = new unsigned char[BLOCK_SIZE];
@@ -32,14 +76,19 @@ bool string_parser::parse_stream(FILE* fh, string data_source)
 		do
 		{
 			// Read the stream in blocks of 0x50000, assuming that a string does not border the regions.
-			numRead = fread( buffer, 1, BLOCK_SIZE, fh);
+			num_read = fread( buffer, 1, BLOCK_SIZE, fh);
 
-			if( numRead > 0 )
+			if( num_read > 0 )
 			{
 				// We have read in the full contents now, lets process it.
-				this->processContents( buffer, numRead, data_source);
+				if( offset > 0 )
+					this->parse_block( buffer, num_read, name_short, name_long + ":offset=" + to_string(offset));
+				else
+					this->parse_block(buffer, num_read, name_short, name_long);
+
+				offset += num_read;
 			}
-		}while( numRead == BLOCK_SIZE );
+		}while( num_read == BLOCK_SIZE );
 
 		// Clean up
 		delete[] buffer;
