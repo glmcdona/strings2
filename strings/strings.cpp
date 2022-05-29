@@ -204,7 +204,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			options.print_interesting = false;
 			options.print_not_interesting = true;
 		}
-		else if (lstrcmp(argv[i], L"-u") == 0 || lstrcmp(argv[i], L"-utf8") == 0)
+		else if (lstrcmp(argv[i], L"-utf") == 0 || lstrcmp(argv[i], L"-utf8") == 0)
 		{
 			options.print_utf8 = true;
 			options.print_wide_string = false;
@@ -218,6 +218,58 @@ int _tmain(int argc, _TCHAR* argv[])
 			flag_dump_pid = true;
 		else if( lstrcmp(argv[i],L"-system") == 0 )
 			flag_dump_system = true;
+		else if (lstrcmp(argv[i], L"-b") == 0)
+		{
+			if (i + 1 < argc)
+			{
+				// Try to parse the byte range 'start(:end)'
+				size_t start = 0;
+				size_t end = 0;
+				std::wstringstream sst(argv[i + 1]);
+				if (!(sst >> start))
+				{
+					fprintf(stderr, "Failed to parse -b argument start. It should be followed by a single or pair of numbers:\n\teg. 'strings2 *.exe -b 6:106'\n");
+					exit(0);
+				}
+
+				if (!sst.eof())
+				{
+					if (sst.get() == ':')
+					{
+						if (!(sst >> end))
+						{
+							fprintf(stderr, "Failed to parse -b argument end. It should be followed by a single or pair of numbers:\n\teg. 'strings2 *.exe -b 6:106'\n");
+							exit(0);
+						}
+						if (!sst.eof())
+						{
+							fprintf(stderr, "Failed to parse -b argument expected end of options after end. It should be followed by a single or pair of numbers:\n\teg. 'strings2 *.exe -b 6:106'\n");
+							exit(0);
+						}
+					}
+					else
+					{
+						fprintf(stderr, "Failed to parse -b argument expected end of options after start. It should be followed by a single or pair of numbers:\n\teg. 'strings2 *.exe -b 6:106'\n");
+						exit(0);
+					}
+				}
+
+				if ( end > 0 && end < start )
+				{
+					fprintf(stderr, "Failed to parse -b argument expected due to invalid specified range. It should be followed by a single or pair of numbers:\n\teg. 'strings2 *.exe -b 6:106'\n");
+					exit(0);
+				}
+
+				options.offset_start = start;
+				options.offset_end = end;
+				i++;
+			}
+			else
+			{
+				fprintf(stderr, "Failed to parse -b argument missing start and end. It should be followed by a single or pair of numbers:\n\teg. 'strings2 *.exe -b 6:106'\n");
+				exit(0);
+			}
+		}
 		else if( lstrcmp(argv[i],L"-l") == 0 )
 		{
 			if(  i + 1 < argc )
@@ -258,24 +310,28 @@ int _tmain(int argc, _TCHAR* argv[])
 		printf("Example Usage:\n");
 		printf("\tstrings2 malware.exe\n");
 		printf("\tstrings2 *.exe > strings.txt\n");
+		printf("\tstrings2 ./files/*.exe > strings.txt\n");
 		printf("\tstrings2 -pid 419 > process_strings.txt\n");
 		printf("\tstrings2 -pid 0x1a3 > process_strings.txt\n");
 		printf("\tstrings2 -system > all_process_strings.txt\n");
-		printf("\tcat abcd.exe | strings2 > out.txt\n\n");
+		printf("\ttype abcd.exe | strings2 > out.txt\n\n");
+		printf("\ttype abcd.exe | strings2 | findstr /i SearchForThisString\n\n");
+		printf("\tstrings2 malware.exe -json > strings.json\n");
 		printf("Flags:\n");
 		printf(" -r\n\tRecursively process subdirectories.\n");
-		printf(" -f\n\tPrints the filename/processname before each string.\n");
-		printf(" -F\n\tPrints the full path and filename before each string.\n");
+		printf(" -f\n\tPrints the filename/processname for each string.\n");
+		printf(" -F\n\tPrints the full path and filename for each string.\n");
 		printf(" -s\n\tPrints the span in the buffer for each string.\n");
-		printf(" -t\n\tPrints the string type before each string. UTF8,\n\tor WIDE_STRING.\n");
-		printf(" -u\n\tPrints only WIDE_STRING strings that are encoded\n\tas two bytes per character.\n");
-		printf(" -y\n\tPrints only UTF8 decoded strings.\n");
-		printf(" -a\n\tPrints all strings including not interesting strings.\n");
-		printf(" -ni\n\tPrints only not interesting strings.\n");
-		printf(" -l [numchars]\n\tMinimum number of characters that is\n\ta valid string. Default is 4.\n");
+		printf(" -t\n\tPrints the string type for each string. UTF8,\n\tor WIDE_STRING.\n");
+		printf(" -wide\n\tPrints only WIDE_STRING strings that are encoded\n\tas two bytes per character.\n");
+		printf(" -utf\n\tPrints only UTF8 encoded strings.\n");
+		printf(" -a\n\tPrints both interesting and not interesting strings.\n\tDefault only prints interesting non-junk strings.\n");
+		printf(" -ni\n\tPrints only not interesting strings. Default only\n\tprints interesting non-junk strings.\n");
+		printf(" -l [numchars]\n\tMinimum number of characters that is a valid string.\n\tDefault is 4.\n");
+		printf(" -b [start](:[end])\n\tScan only the specified byte range for strings\n");
 		printf(" -pid\n\tThe strings from the process address space for the\n\tspecified PID will be dumped. Use a '0x' prefix to\n\tspecify a hex PID.\n");
 		printf(" -system\n\tDumps strings from all accessible processes on the\n\tsystem. This takes awhile.\n");
-		printf(" -json [file]\n\tWrites output to the specified json file.\n");
+		printf(" -json\n\tWrites output as json.\n");
 	}else{
 		// Create the string parser object
 		string_parser* parser = new string_parser(options);

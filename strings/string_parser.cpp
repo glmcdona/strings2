@@ -69,10 +69,13 @@ bool string_parser::parse_stream(FILE* fh, string name_short, string name_long)
 {
 	if( fh != NULL )
 	{
-		
 		unsigned char* buffer;
 		int num_read;
 		long long offset = 0;
+
+		// Adjust the start offset if specified
+		if (m_options.offset_start > 0)
+			fseek(fh, m_options.offset_start, SEEK_SET);
 
 		// Allocate the buffer
 		buffer = new unsigned char[BLOCK_SIZE];
@@ -80,7 +83,15 @@ bool string_parser::parse_stream(FILE* fh, string name_short, string name_long)
 		do
 		{
 			// Read the stream in blocks of 0x50000, assuming that a string does not border the regions.
-			num_read = fread( buffer, 1, BLOCK_SIZE, fh);
+			if (m_options.offset_end > 0)
+			{
+				num_read = fread(buffer, 1, min(BLOCK_SIZE, m_options.offset_end - m_options.offset_start), fh);
+			}
+			else
+			{
+				num_read = fread(buffer, 1, BLOCK_SIZE, fh);
+			}
+			
 
 			if( num_read > 0 )
 			{

@@ -1,4 +1,4 @@
-#include "StdAfx.h"
+#include "stdafx.h"
 #include "binary2strings.hpp"
 
 using namespace std;
@@ -97,7 +97,8 @@ int get_language_group(wchar_t c)
 	return bmp_12bits_to_group[c >> 4]; // Leading 12 bits identify the language group
 }
 
-extracted_string* try_extract_string(const unsigned char* buffer, size_t buffer_size, long offset, size_t min_chars)
+// Note: Buffer overrun security checks disabled, since they added ~50% overhead.
+__declspec(safebuffers) extracted_string* try_extract_string(const unsigned char* buffer, size_t buffer_size, long offset, size_t min_chars)
 {
 	// Try extracting the string as either utf8 or unicode wchar format. Returns None if it's not a valid string.
 	int i;

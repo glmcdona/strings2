@@ -23,6 +23,8 @@ struct STRING_OPTIONS
 	bool print_span = false;
 	bool print_json = false;
 	int min_chars = 4;
+	size_t offset_start = 0;
+	size_t offset_end = 0;
 };
 
 class string_parser
