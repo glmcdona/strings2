@@ -8,7 +8,7 @@ bool IsWin64(HANDLE process)
 	{
 		return ret_val;
 	}
-	PrintLastError((LPTSTR) "IsWow64Process");
+	PrintLastError((LPTSTR) L"IsWow64Process");
 	return false;
 }
 
@@ -49,38 +49,29 @@ bool process_strings::dump_process(DWORD pid)
 	if( ph != NULL )
 	{
 		// Assign the process name
-		TCHAR* process_name_w = new TCHAR[0x100];
-		process_name_w[0] = 0;
-		GetModuleBaseName(ph, 0, process_name_w, 0x100 );
-		char* process_name = new char[0x100];
-		process_name[0] = 0;
-
-		// Convert from wchar to char filename
-		wcstombs( process_name, process_name_w, 0x100 );
+		char process_name[0x100] = { 0 };
+		GetModuleBaseNameA(ph, 0, process_name, 0x100 );
 		
-		// Generate the module list
+		// Generate memory region list
 		HANDLE hSnapshot=CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, pid);
 		if ( hSnapshot != INVALID_HANDLE_VALUE )
 		{
 			this->_generate_module_list(hSnapshot);
 			CloseHandle(hSnapshot);
 			
-			// Walk through the process heaps, extracting the strings
+			// Walk through the process regions, extracting the strings
 			bool result = this->_process_all_memory(ph, process_name);
 
-			free(process_name);
 			return result;
 		}else{
 			fprintf(stderr,"Failed gather module information for process 0x%x (%i). ", pid, pid);
-			PrintLastError((LPTSTR) "dump_process");
+			PrintLastError( (LPTSTR) L"dump_process");
 		}
-
-		free(process_name);
-		return false;
 	}else{
 		fprintf(stderr,"Failed open process 0x%x (%i). ", pid, pid);
-		PrintLastError((LPTSTR) "dump_process");
+		PrintLastError((LPTSTR) L"dump_process");
 	}
+	return false;
 }
 
 process_strings::process_strings(string_parser* parser)
@@ -89,55 +80,102 @@ process_strings::process_strings(string_parser* parser)
 }
 
 
+MBI_BASIC_INFO process_strings::_get_mbi_info(unsigned __int64 address, HANDLE ph)
+{
+	_MEMORY_BASIC_INFORMATION64 mbi;
+	MBI_BASIC_INFO result;
+	result.base = 0;
+	result.end = 0;
+	result.protect = 0;
+	result.valid = false;
+	result.executable = false;
+
+	// Load this heap information
+	__int64 blockSize = VirtualQueryEx(ph, (LPCVOID)address, (PMEMORY_BASIC_INFORMATION)&mbi, sizeof(_MEMORY_BASIC_INFORMATION64));
+
+	if (blockSize == sizeof(_MEMORY_BASIC_INFORMATION64))
+	{
+		result.base = mbi.BaseAddress;
+		result.end = mbi.BaseAddress + mbi.RegionSize;
+		result.protect = mbi.Protect;
+		result.valid = mbi.State != MEM_FREE && !(mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD));
+		result.executable = (mbi.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)) > 0;
+		result.size = mbi.RegionSize;
+	}
+	else if (blockSize == sizeof(_MEMORY_BASIC_INFORMATION32))
+	{
+		_MEMORY_BASIC_INFORMATION32* mbi32 = (_MEMORY_BASIC_INFORMATION32*)&mbi;
+
+		result.base = mbi32->BaseAddress;
+		result.end = mbi32->BaseAddress + mbi32->RegionSize;
+		result.protect = mbi32->Protect;
+		result.valid = mbi32->State != MEM_FREE && !(mbi32->Protect & (PAGE_NOACCESS | PAGE_GUARD));
+		result.executable = (mbi32->Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)) > 0;
+		result.size = mbi.RegionSize;
+	}
+
+	return result;
+}
+
 bool process_strings::_process_all_memory(HANDLE ph, string process_name)
 {
 	// Set the max address of the target process. Assume it is a 64 bit process.
-	__int64 max_address = 0;
-	max_address = 0x7ffffffffff;
+	unsigned __int64 max_address = 0xffffffffffffffff; // Not a problem for 32bit targets
 
     // Walk the process heaps
-    __int64 address = 0;
-    MEMORY_BASIC_INFORMATION mbi;
+    unsigned __int64 address = 0;
 	
     while (address < max_address)
     {
         // Load this region information
-        __int64 block_size = VirtualQueryEx(ph, (LPCVOID) address, (_MEMORY_BASIC_INFORMATION*) &mbi, sizeof(_MEMORY_BASIC_INFORMATION64));
-		__int64 new_address = (__int64)mbi.BaseAddress + (__int64)mbi.RegionSize + (__int64)1;
-		if( new_address <= address )
-			break;
-		address = new_address;
+		MBI_BASIC_INFO mbi_info = _get_mbi_info(address, ph);
 
-		if( mbi.State == MEM_COMMIT && !(mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD)) )
+		if (mbi_info.end + 1 <= address)
+			break;
+		address = mbi_info.end + 1;
+		
+		if(mbi_info.valid && mbi_info.size > 0)
 		{
 			// Process this region
 
 			// Read in the region
-			unsigned char* buffer = new unsigned char[mbi.RegionSize];
+			unsigned char* buffer = new unsigned char[mbi_info.size];
 			if( buffer != NULL )
 			{
 				__int64 num_read = 0;
-				bool result = ReadProcessMemory(ph, (LPCVOID) mbi.BaseAddress, buffer, mbi.RegionSize,(SIZE_T*) &num_read);
+				bool result = ReadProcessMemory(ph, (LPCVOID) mbi_info.base, buffer, mbi_info.size,(SIZE_T*) &num_read);
 
 				//fprintf(stderr,"Current address: %016llX\n",mbi.BaseAddress);
 				if( num_read > 0 )
 				{
-					if( num_read != (unsigned int) mbi.RegionSize )
-						fprintf(stderr,"Failed read full region from address 0x%016llX: %s. Only %i of expected %i bytes were read.\n", mbi.BaseAddress, strerror(errno), num_read, mbi.RegionSize);
+					if( num_read != mbi_info.size)
+						fprintf(stderr,"Failed read full region from address 0x%p: %s. Only %lld of expected %lld bytes were read.\n", mbi_info.base, strerror(errno), num_read, mbi_info.size);
+
+					// Load the module name if applicable
+					string module_name_short = "(unknown)";
+					string module_name_long = "(unknown)";
+
+					for (int i = 0; i < m_modules.size(); i++)
+					{
+						if (m_modules[i].contains((PVOID64) mbi_info.base))
+						{
+							module_name_short = m_modules[i].get_filename();
+							module_name_long = m_modules[i].get_filepath();
+						}
+					}
 
 					// Print the strings from this region
-					std::stringstream stream;
-					stream << "0x" << std::hex << mbi.BaseAddress;
-					m_parser->parse_block( buffer, num_read, process_name, stream.str() );
-				}else if( !result ){
-					fprintf(stderr,"Failed to read from address 0x%016llX. ", mbi.BaseAddress);
-					PrintLastError((LPTSTR) "ReadProcessMemory");
+					std::stringstream long_name;
+					long_name << process_name << "->" << module_name_long << ":0x" << std::hex << mbi_info.base;
+					std::stringstream short_name;
+					short_name << process_name << "->" << module_name_short;
+					m_parser->parse_block( buffer, num_read, short_name.str(), long_name.str() );
 				}
 
 				// Cleanup
-				free(buffer);
+				delete[] buffer;
 			}else{
-				fprintf(stderr,"Failed to allocate space of %x for reading in a region.", mbi.RegionSize);
+				fprintf(stderr,"Failed to allocate space of %lld for reading in a region.", mbi_info.size);
 			}
 		}
     }

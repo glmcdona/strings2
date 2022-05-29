@@ -284,7 +284,7 @@ vector<std::tuple<string, string, std::pair<int, int>, bool>> extract_all_string
 		// This string is interesting is the window just before or after is interesting
 		proba_interesting_avg = proba_interesting_avg_vect[i];
 
-		if (i + WINDOW_SIZE <= proba_interesting_avg_vect.size())
+		if (i + WINDOW_SIZE < proba_interesting_avg_vect.size())
 		{
 			if (proba_interesting_avg_vect[i + WINDOW_SIZE] > proba_interesting_avg)
 				proba_interesting_avg = proba_interesting_avg_vect[i + WINDOW_SIZE];

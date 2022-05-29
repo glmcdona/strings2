@@ -9,20 +9,20 @@
 using namespace std;
 
 constexpr auto MAX_STRING_SIZE = 0x2000;
-constexpr auto BLOCK_SIZE = 1e+8; // 100MB
+constexpr auto BLOCK_SIZE = 5e+7; // 50MB
 
 struct STRING_OPTIONS
 {
-	bool print_utf8;
-	bool print_wide_string;
-	bool print_string_type;
-	bool print_interesting;
-	bool print_not_interesting;
-	bool print_filename;
-	bool print_filepath;
-	bool print_span;
-	wstring json_file_output;
-	int min_chars;
+	bool print_utf8 = true;
+	bool print_wide_string = true;
+	bool print_string_type = false;
+	bool print_interesting = true;
+	bool print_not_interesting = false;
+	bool print_filename = false;
+	bool print_filepath = false;
+	bool print_span = false;
+	bool print_json = false;
+	int min_chars = 4;
 };
 
 class string_parser

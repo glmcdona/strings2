@@ -1,6 +1,8 @@
 // strings.cpp : Defines the entry point for the console application.
 //
 #pragma once
+#pragma execution_character_set( "utf-8" )
+
 #include "stdafx.h"
 #include "string_parser.h"
 #include "windows.h"
@@ -22,7 +24,7 @@
 
 
 using namespace std;
-using namespace std::filesystem;
+//using namespace std::filesystem;
 
 BOOL is_win64()
 {
@@ -107,7 +109,7 @@ void process_folder( string dir_name, string filter, bool recursively, string_pa
 							fclose(fh);
 						}else{
 							// Error
-							fprintf(stderr, "Error opening file %s: %s.\n", filepath, strerror(errno));
+							fprintf(stderr, "Error opening file %s: %s.\n", filepath.c_str(), strerror(errno));
 						}
 					}
 				}
@@ -120,7 +122,7 @@ void process_folder( string dir_name, string filter, bool recursively, string_pa
 		}
 		closedir (dir);
 	}else{
-		fprintf(stderr, "Unable to open directory %s: %s.\n", dir_name, strerror(errno));
+		fprintf(stderr, "Unable to open directory %s: %s.\n", dir_name.c_str(), strerror(errno));
 	}
 }
 
@@ -155,27 +157,20 @@ bool get_privileges(HANDLE h_Process)
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	//char buf[1000000];
-	//setvbuf(stdout, buf, _IOFBF, sizeof(buf));
+	// Enable UTF-8 console
+	SetConsoleOutputCP(65001);
 
 	// Process the flags	
+	STRING_OPTIONS options;
+
 	WCHAR* filter = NULL;
+
 	bool flag_help = false;
-	bool flag_filename = false;
-	bool flag_filepath = false;
-	bool flag_utf8_only = false;
-	bool flag_wide_string_only = false;
 	bool piped_input = !_isatty( _fileno( stdin ) );
 	bool flag_dump_pid = false;
 	bool flag_dump_system = false;
 	bool flag_recursive = false;
-	bool flag_all_strings = false;
-	bool flag_strings_interesting = true;
-	bool flag_strings_not_interesting = false;
-	bool flag_print_string_type = false;
-	bool flag_print_json = false;
-	WCHAR* flag_json_file = NULL;
-	int minCharacters = 4;
+	
 
 	if( argc <= 1 && !piped_input )
 		flag_help = true;
@@ -184,42 +179,41 @@ int _tmain(int argc, _TCHAR* argv[])
 		if (lstrcmp(argv[i], L"--help") == 0 || lstrcmp(argv[i], L"-help") == 0 || lstrcmp(argv[i], L"-h") == 0 || lstrcmp(argv[i], L"--h") == 0)
 			flag_help = true;
 		else if (lstrcmp(argv[i], L"-f") == 0)
-			flag_filename = true;
+			options.print_filename = true;
 		else if (lstrcmp(argv[i], L"-F") == 0)
-			flag_filepath = true;
+			options.print_filepath = true;
 		else if (lstrcmp(argv[i], L"-r") == 0)
 			flag_recursive = true;
 		else if (lstrcmp(argv[i], L"-t") == 0)
-			flag_print_string_type = true;
+			options.print_string_type = true;
+		else if (lstrcmp(argv[i], L"-s") == 0)
+			options.print_span = true;
 		else if (lstrcmp(argv[i], L"-json") == 0)
 		{
-			flag_print_json = true;
-
-			if (i + 1 < argc)
-			{
-				flag_json_file = argv[i+1];
-			}
-			else {
-				fprintf(stderr, "Failed to parse -json argument. It must be followed by a file:\n\teg. 'strings2 *.exe -json result.json'\n");
-				exit(0);
-			}
+			options.print_json = true;
 		}
 		else if (lstrcmp(argv[i], L"-a") == 0)
 		{
-			// Both interesting and not interesting
-			flag_strings_interesting = true;
-			flag_strings_not_interesting = true;
+			// Both all strings. Interesting and not interesting
+			options.print_interesting = true;
+			options.print_not_interesting = true;
 		}
 		else if (lstrcmp(argv[i], L"-ni") == 0)
 		{
 			// Only not interesting
-			flag_strings_interesting = false;
-			flag_strings_not_interesting = true;
+			options.print_interesting = false;
+			options.print_not_interesting = true;
 		}
-		else if(lstrcmp(argv[i], L"-u") == 0 || lstrcmp(argv[i],L"-utf8") == 0 )
-			flag_utf8_only = true;
-		else if(lstrcmp(argv[i], L"-w") == 0 || lstrcmp(argv[i],L"-wide") == 0 )
-			flag_wide_string_only = true;
+		else if (lstrcmp(argv[i], L"-u") == 0 || lstrcmp(argv[i], L"-utf8") == 0)
+		{
+			options.print_utf8 = true;
+			options.print_wide_string = false;
+		}
+		else if (lstrcmp(argv[i], L"-w") == 0 || lstrcmp(argv[i], L"-wide") == 0)
+		{
+			options.print_utf8 = false;
+			options.print_wide_string = true;
+		}
 		else if( lstrcmp(argv[i],L"-pid") == 0 )
 			flag_dump_pid = true;
 		else if( lstrcmp(argv[i],L"-system") == 0 )
@@ -232,7 +226,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				int result = _wtoi(argv[i+1]);
 				if( result >= 3 )
 				{
-					minCharacters = result;
+					options.min_chars = result;
 				}else{
 					fprintf(stderr,"Failed to parse -l argument. The string size must be 3 or larger:\n\teg. 'strings2 *.exe -l 6'\n");
 					exit(0);
@@ -257,29 +251,6 @@ int _tmain(int argc, _TCHAR* argv[])
 		}
 	}
 
-	// Fill out the options structure based on the flags
-	STRING_OPTIONS options;
-
-	options.min_chars = minCharacters;
-
-	options.print_utf8 = flag_utf8_only || !flag_wide_string_only;
-	options.print_wide_string = flag_wide_string_only || !flag_utf8_only;
-
-	options.print_interesting = flag_strings_interesting;
-	options.print_not_interesting = flag_strings_not_interesting;
-
-	options.print_string_type = flag_print_string_type;
-	options.print_filename = flag_filename;
-	options.print_filepath = flag_filepath;
-
-	options.json_file_output = wstring(L"");
-	if (flag_json_file != NULL)
-	{
-		options.json_file_output = wstring(flag_json_file);
-	}
-	
-	
-
 	if( flag_help )
 	{
 		// Print help page
@@ -295,6 +266,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		printf(" -r\n\tRecursively process subdirectories.\n");
 		printf(" -f\n\tPrints the filename/processname before each string.\n");
 		printf(" -F\n\tPrints the full path and filename before each string.\n");
+		printf(" -s\n\tPrints the span in the buffer for each string.\n");
 		printf(" -t\n\tPrints the string type before each string. UTF8,\n\tor WIDE_STRING.\n");
 		printf(" -u\n\tPrints only WIDE_STRING strings that are encoded\n\tas two bytes per character.\n");
 		printf(" -y\n\tPrints only UTF8 decoded strings.\n");
@@ -392,7 +364,15 @@ int _tmain(int argc, _TCHAR* argv[])
 			if( p.has_filename() || p.has_parent_path() )
 			{
 				// Process the specified files
-				process_folder( p.parent_path().string(), p.filename().string(), flag_recursive, parser);
+				string parent_path = ".";
+				if (p.has_parent_path())
+					parent_path = p.parent_path().string();
+
+				string filename = "*";
+				if (p.has_filename())
+					filename = p.filename().string();
+
+				process_folder( parent_path, filename, flag_recursive, parser);
 			}
 			else
 			{

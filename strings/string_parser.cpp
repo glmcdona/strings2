@@ -11,7 +11,7 @@ bool string_parser::parse_block(unsigned char* buffer, unsigned int buffer_lengt
 		vector<std::tuple<string, string, std::pair<int, int>, bool>> r_vect = extract_all_strings(buffer, buffer_length, this->m_options.min_chars, !this->m_options.print_not_interesting);
 
 		
-		if (m_options.json_file_output.length() > 0)
+		if (m_options.print_json)
 		{
 			// Output the strings to a json file
 			json j;
@@ -31,26 +31,30 @@ bool string_parser::parse_block(unsigned char* buffer, unsigned int buffer_lengt
 			// Iterate through the resulting strings, printing them
 			for (int i = 0; i < r_vect.size(); i++)
 			{
-				// Add the prefixes as appropriate
-				if (m_options.print_filepath)
-					this->m_printer->add_string(name_short + ",");
-
-				if (m_options.print_filename)
-					this->m_printer->add_string(name_long + ",");
-
-				if (m_options.print_string_type)
-					this->m_printer->add_string(std::get<1>(r_vect[i]));
-
-				if (m_options.print_span)
+				bool is_interesting = std::get<3>(r_vect[i]);
+				if (is_interesting && m_options.print_interesting ||
+					!is_interesting && m_options.print_not_interesting)
 				{
-					string span = "(" + to_string(std::get<2>(r_vect[i]).first) + "," + to_string(std::get<2>(r_vect[i]).second) + ")" + ",";
-					this->m_printer->add_string(span);
-				}
+					// Add the prefixes as appropriate
+					if (m_options.print_filepath)
+						this->m_printer->add_string(name_long + ",");
 
-				this->m_printer->add_string(std::get<0>(r_vect[i]) + "\n");
+					if (m_options.print_filename)
+						this->m_printer->add_string(name_short + ",");
+
+					if (m_options.print_string_type)
+						this->m_printer->add_string(std::get<1>(r_vect[i]) + ",");
+
+					if (m_options.print_span)
+					{
+						string span = "(" + to_string(std::get<2>(r_vect[i]).first) + "," + to_string(std::get<2>(r_vect[i]).second) + ")" + ",";
+						this->m_printer->add_string(span);
+					}
+
+					this->m_printer->add_string(std::get<0>(r_vect[i]) + "\n");
+				}
 			}
 		}
-		
 	}
 	return false;
 }
@@ -88,6 +92,8 @@ bool string_parser::parse_stream(FILE* fh, string name_short, string name_long)
 
 				offset += num_read;
 			}
+
+			this->m_printer->digest();
 		}while( num_read == BLOCK_SIZE );
 
 		// Clean up
