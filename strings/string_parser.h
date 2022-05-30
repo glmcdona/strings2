@@ -1,48 +1,32 @@
 #pragma once
 #include <string>
 #include "windows.h"
-#include "DynArray.h"
 #include "print_buffer.h"
-#include "string_hashes.h"
+#include "binary2strings.hpp"
+#include "json.hpp"
+#include <algorithm>
+#include <errno.h>
 
 using namespace std;
 
-#define MAX_STRING_SIZE 0x2000
-#define BLOCK_SIZE 0x50000
-
-
-// Quick way of checking if a character value is displayable ascii
-static bool isAscii[0x100] =
-	/*          0     1     2     3        4     5     6     7        8     9     A     B        C     D     E     F     */
-	/* 0x00 */ {false,false,false,false,   false,false,false,false,   false,true ,true ,false,   false,true ,false,false,
-	/* 0x10 */  false,false,false,false,   false,false,false,false,   false,false,false,false,   false,false,false,false,
-	/* 0x20 */  true ,true ,true ,true ,   true ,true ,true ,true ,   true ,true ,true ,true ,   true ,true ,true ,true ,
-	/* 0x30 */  true ,true ,true ,true ,   true ,true ,true ,true ,   true ,true ,true ,true ,   true ,true ,true ,true ,
-	/* 0x40 */  true ,true ,true ,true ,   true ,true ,true ,true ,   true ,true ,true ,true ,   true ,true ,true ,true ,
-	/* 0x50 */  true ,true ,true ,true ,   true ,true ,true ,true ,   true ,true ,true ,true ,   true ,true ,true ,true ,
-	/* 0x60 */  true ,true ,true ,true ,   true ,true ,true ,true ,   true ,true ,true ,true ,   true ,true ,true ,true ,
-	/* 0x70 */  true ,true ,true ,true ,   true ,true ,true ,true ,   true ,true ,true ,true ,   true ,true ,true ,false,
-	/* 0x80 */  false,false,false,false,   false,false,false,false,   false,false,false,false,   false,false,false,false,
-	/* 0x90 */  false,false,false,false,   false,false,false,false,   false,false,false,false,   false,false,false,false,
-	/* 0xA0 */  false,false,false,false,   false,false,false,false,   false,false,false,false,   false,false,false,false,
-	/* 0xB0 */  false,false,false,false,   false,false,false,false,   false,false,false,false,   false,false,false,false,
-	/* 0xC0 */  false,false,false,false,   false,false,false,false,   false,false,false,false,   false,false,false,false,
-	/* 0xD0 */  false,false,false,false,   false,false,false,false,   false,false,false,false,   false,false,false,false,
-	/* 0xE0 */  false,false,false,false,   false,false,false,false,   false,false,false,false,   false,false,false,false,
-	/* 0xF0 */  false,false,false,false,   false,false,false,false,   false,false,false,false,   false,false,false,false};
+constexpr auto MAX_STRING_SIZE = 0x2000;
+constexpr auto BLOCK_SIZE = 5e+7; // 50MB
 
 struct STRING_OPTIONS
 {
-	bool printAsciiOnly;
-	bool printUnicodeOnly;
-	bool printFile;
-	bool printType;
-	bool printNormal;
-	bool printASM;
-	bool printUniqueLocal;
-	bool printUniqueGlobal;
-	bool escapeNewLines;
-	int minCharacters;
+	bool print_utf8 = true;
+	bool print_wide_string = true;
+	bool print_string_type = false;
+	bool print_interesting = true;
+	bool print_not_interesting = false;
+	bool print_filename = false;
+	bool print_filepath = false;
+	bool print_span = false;
+	bool print_json = false;
+	bool escape_new_lines = false;
+	int min_chars = 4;
+	size_t offset_start = 0;
+	size_t offset_end = 0;
 };
 
 class string_parser
@@ -61,16 +45,12 @@ class string_parser
 	  TYPE_UNICODE
 	};
 	
-	STRING_OPTIONS options;
-	print_buffer* printer;
+	STRING_OPTIONS m_options;
+	print_buffer* m_printer;
 	
-
-	int extractImmediate( char* immediate, int immediateSize, STRING_TYPE &stringType, unsigned char* outputString );
-	int extractString( unsigned char*  buffer, long bufferSize, long offset, unsigned char* outputString, int outputStringSize, int &outputStringLength, EXTRACT_TYPE &extractType, STRING_TYPE & stringType);
-	bool processContents( unsigned char* buffer, long numRead, LPCSTR filepath );
 public:
 	string_parser( STRING_OPTIONS options );
-	bool parse_block( unsigned char* buffer, unsigned int buffer_length, LPCSTR datasource );
-	bool parse_stream( FILE* fh, LPCSTR datasource );
+	bool parse_block( unsigned char* buffer, unsigned int buffer_length, string name_short, string name_long, unsigned long long base_address);
+	bool parse_stream( FILE* fh, string name_short, string name_long);
 	~string_parser(void);
 };
