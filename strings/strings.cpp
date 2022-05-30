@@ -314,7 +314,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		printf("\tstrings2 *.exe > strings.txt\n");
 		printf("\tstrings2 ./files/*.exe > strings.txt\n");
 		printf("\tstrings2 -pid 419 > process_strings.txt\n");
-		printf("\tstrings2 -pid 0x1a3 > process_strings.txt\n");
+		printf("\tstrings2 -f -s -pid 0x1a3 > process_strings.txt\n");
 		printf("\tstrings2 -system > all_process_strings.txt\n");
 		printf("\ttype abcd.exe | strings2 > out.txt\n\n");
 		printf("\ttype abcd.exe | strings2 | findstr /i SearchForThisString\n\n");
