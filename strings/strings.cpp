@@ -331,7 +331,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		printf(" -ni\n\tPrints only not interesting strings. Default only\n\tprints interesting non-junk strings.\n");
 		printf(" -e\n\tEscape new line characters.\n");
 		printf(" -l [numchars]\n\tMinimum number of characters that is a valid string.\n\tDefault is 4.\n");
-		printf(" -b [start](:[end])\n\tScan only the specified byte range for strings\n");
+		printf(" -b [start](:[end])\n\tScan only the specified byte range for strings.\n");
 		printf(" -pid [pid]\n\tThe strings from the process address space for the\n\tspecified PID will be dumped. Use a '0x' prefix to\n\tspecify a hex PID.\n");
 		printf(" -system\n\tDumps strings from all accessible processes on the\n\tsystem. This takes awhile.\n");
 		printf(" -json\n\tWrites output as json. Many flags are ignored in this mode.\n");

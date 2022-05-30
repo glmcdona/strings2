@@ -207,6 +207,7 @@
     <ClInclude Include="module.h" />
     <ClInclude Include="print_buffer.h" />
     <ClInclude Include="memory_strings.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="string_model.h" />
     <ClInclude Include="string_parser.h" />
@@ -214,6 +215,9 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="strings.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
