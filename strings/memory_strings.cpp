@@ -1,5 +1,5 @@
 #include "StdAfx.h"
-#include "process_strings.h"
+#include "memory_strings.h"
 
 bool IsWin64(HANDLE process)
 {
@@ -12,7 +12,7 @@ bool IsWin64(HANDLE process)
 	return false;
 }
 
-bool process_strings::dump_system()
+bool memory_strings::dump_system()
 {
 	// Enumerate processes, and process the strings from each one
 	HANDLE h_snapshot=CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,0);
@@ -42,7 +42,7 @@ bool process_strings::dump_system()
 	return false;
 }
 
-bool process_strings::dump_process(DWORD pid)
+bool memory_strings::dump_process(DWORD pid)
 {
 	// Open the process
 	HANDLE ph = OpenProcess( PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid);
@@ -74,13 +74,13 @@ bool process_strings::dump_process(DWORD pid)
 	return false;
 }
 
-process_strings::process_strings(string_parser* parser)
+memory_strings::memory_strings(string_parser* parser)
 {
 	this->m_parser = parser;
 }
 
 
-MBI_BASIC_INFO process_strings::_get_mbi_info(unsigned __int64 address, HANDLE ph)
+MBI_BASIC_INFO memory_strings::_get_mbi_info(unsigned __int64 address, HANDLE ph)
 {
 	_MEMORY_BASIC_INFORMATION64 mbi;
 	MBI_BASIC_INFO result;
@@ -107,7 +107,7 @@ MBI_BASIC_INFO process_strings::_get_mbi_info(unsigned __int64 address, HANDLE p
 		_MEMORY_BASIC_INFORMATION32* mbi32 = (_MEMORY_BASIC_INFORMATION32*)&mbi;
 
 		result.base = mbi32->BaseAddress;
-		result.end = mbi32->BaseAddress + mbi32->RegionSize;
+		result.end = (long long) mbi32->BaseAddress + (long long)mbi32->RegionSize;
 		result.protect = mbi32->Protect;
 		result.valid = mbi32->State != MEM_FREE && !(mbi32->Protect & (PAGE_NOACCESS | PAGE_GUARD));
 		result.executable = (mbi32->Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)) > 0;
@@ -117,7 +117,7 @@ MBI_BASIC_INFO process_strings::_get_mbi_info(unsigned __int64 address, HANDLE p
 	return result;
 }
 
-bool process_strings::_process_all_memory(HANDLE ph, string process_name)
+bool memory_strings::_process_all_memory(HANDLE ph, string process_name)
 {
 	// Set the max address of the target process. Assume it is a 64 bit process.
 	unsigned __int64 max_address = 0xffffffffffffffff; // Not a problem for 32bit targets
@@ -142,18 +142,18 @@ bool process_strings::_process_all_memory(HANDLE ph, string process_name)
 			unsigned char* buffer = new unsigned char[mbi_info.size];
 			if( buffer != NULL )
 			{
-				__int64 num_read = 0;
+				unsigned __int64 num_read = 0;
 				bool result = ReadProcessMemory(ph, (LPCVOID) mbi_info.base, buffer, mbi_info.size,(SIZE_T*) &num_read);
 
 				//fprintf(stderr,"Current address: %016llX\n",mbi.BaseAddress);
 				if( num_read > 0 )
 				{
 					if( num_read != mbi_info.size)
-						fprintf(stderr,"Failed read full region from address 0x%p: %s. Only %lld of expected %lld bytes were read.\n", mbi_info.base, strerror(errno), num_read, mbi_info.size);
+						fprintf(stderr,"Failed read full region from address 0x%llx: %s. Only %lld of expected %lld bytes were read.\n", mbi_info.base, strerror(errno), num_read, mbi_info.size);
 
 					// Load the module name if applicable
-					string module_name_short = "(unknown)";
-					string module_name_long = "(unknown)";
+					string module_name_short = "region";
+					string module_name_long = "region";
 
 					for (int i = 0; i < m_modules.size(); i++)
 					{
@@ -166,10 +166,10 @@ bool process_strings::_process_all_memory(HANDLE ph, string process_name)
 
 					// Print the strings from this region
 					std::stringstream long_name;
-					long_name << process_name << "->" << module_name_long << ":0x" << std::hex << mbi_info.base;
+					long_name << process_name << ":" << module_name_long << "@0x" << std::hex << mbi_info.base;
 					std::stringstream short_name;
-					short_name << process_name << "->" << module_name_short;
-					m_parser->parse_block( buffer, num_read, short_name.str(), long_name.str() );
+					short_name << process_name << ":" << module_name_short << "@0x" << std::hex << mbi_info.base;
+					m_parser->parse_block( buffer, num_read, short_name.str(), long_name.str(), mbi_info.base );
 				}
 
 				// Cleanup
@@ -183,7 +183,7 @@ bool process_strings::_process_all_memory(HANDLE ph, string process_name)
 	return true;
 }
 
-void process_strings::_generate_module_list(HANDLE hSnapshot)
+void memory_strings::_generate_module_list(HANDLE hSnapshot)
 {
 	MODULEENTRY32 tmp_m;
 	tmp_m.dwSize = sizeof(MODULEENTRY32);
@@ -202,6 +202,6 @@ void process_strings::_generate_module_list(HANDLE hSnapshot)
 	}
 }
 
-process_strings::~process_strings(void)
+memory_strings::~memory_strings(void)
 {
 }

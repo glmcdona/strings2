@@ -4,6 +4,7 @@
 #include "print_buffer.h"
 #include "binary2strings.hpp"
 #include "json.hpp"
+#include <algorithm>
 #include <errno.h>
 
 using namespace std;
@@ -22,6 +23,7 @@ struct STRING_OPTIONS
 	bool print_filepath = false;
 	bool print_span = false;
 	bool print_json = false;
+	bool escape_new_lines = false;
 	int min_chars = 4;
 	size_t offset_start = 0;
 	size_t offset_end = 0;
@@ -48,7 +50,7 @@ class string_parser
 	
 public:
 	string_parser( STRING_OPTIONS options );
-	bool parse_block( unsigned char* buffer, unsigned int buffer_length, string name_short, string name_long );
+	bool parse_block( unsigned char* buffer, unsigned int buffer_length, string name_short, string name_long, unsigned long long base_address);
 	bool parse_stream( FILE* fh, string name_short, string name_long);
 	~string_parser(void);
 };

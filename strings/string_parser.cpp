@@ -3,7 +3,7 @@
 
 using namespace nlohmann;
 
-bool string_parser::parse_block(unsigned char* buffer, unsigned int buffer_length, string name_short, string name_long)
+bool string_parser::parse_block(unsigned char* buffer, unsigned int buffer_length, string name_short, string name_long, unsigned long long base_address)
 {
 	if( buffer != NULL && buffer_length > 0)
 	{
@@ -21,7 +21,7 @@ bool string_parser::parse_block(unsigned char* buffer, unsigned int buffer_lengt
 			{
 				j["strings"][i]["string"] = std::get<0>(r_vect[i]);
 				j["strings"][i]["type"] = std::get<1>(r_vect[i]);
-				j["strings"][i]["span"] = { std::get<2>( r_vect[i]).first, std::get<2>(r_vect[i]).second };
+				j["strings"][i]["span"] = { std::get<2>(r_vect[i]).first + base_address, std::get<2>(r_vect[i]).second + base_address };
 				j["strings"][i]["is_interesting"] = std::get<3>(r_vect[i]);
 			}
 			this->m_printer->add_json_string(j.dump());
@@ -47,11 +47,42 @@ bool string_parser::parse_block(unsigned char* buffer, unsigned int buffer_lengt
 
 					if (m_options.print_span)
 					{
-						string span = "(" + to_string(std::get<2>(r_vect[i]).first) + "," + to_string(std::get<2>(r_vect[i]).second) + ")" + ",";
-						this->m_printer->add_string(span);
+						std::stringstream span;
+						span << std::hex << "(0x" << (std::get<2>(r_vect[i]).first + base_address) << ",0x" << (std::get<2>(r_vect[i]).second + base_address) << "),";
+						this->m_printer->add_string(span.str());
 					}
 
-					this->m_printer->add_string(std::get<0>(r_vect[i]) + "\n");
+					string s = std::get<0>(r_vect[i]);
+					if (m_options.escape_new_lines)
+					{
+						size_t index = 0;
+						while (true) {
+							/* Locate the substring to replace. */
+							index = s.find("\n", index);
+							if (index == std::string::npos) break;
+
+							/* Make the replacement. */
+							s.replace(index, 1, "\\n");
+
+							/* Advance index forward so the next iteration doesn't pick it up as well. */
+							index += 2;
+						}
+
+						index = 0;
+						while (true) {
+							/* Locate the substring to replace. */
+							index = s.find("\r", index);
+							if (index == std::string::npos) break;
+
+							/* Make the replacement. */
+							s.replace(index, 1, "\\r");
+
+							/* Advance index forward so the next iteration doesn't pick it up as well. */
+							index += 2;
+						}
+					}
+					
+					this->m_printer->add_string(s + "\n");
 				}
 			}
 		}
@@ -97,9 +128,9 @@ bool string_parser::parse_stream(FILE* fh, string name_short, string name_long)
 			{
 				// We have read in the full contents now, lets process it.
 				if( offset > 0 )
-					this->parse_block( buffer, num_read, name_short, name_long + ":offset=" + to_string(offset));
+					this->parse_block( buffer, num_read, name_short, name_long + ":offset=" + to_string(offset), 0);
 				else
-					this->parse_block(buffer, num_read, name_short, name_long);
+					this->parse_block(buffer, num_read, name_short, name_long, 0);
 
 				offset += num_read;
 			}

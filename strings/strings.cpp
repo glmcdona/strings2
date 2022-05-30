@@ -16,7 +16,7 @@
 #include <stdio.h>
 #include <io.h>
 #include <fcntl.h>
-#include "process_strings.h"
+#include "memory_strings.h"
 #include <string>
 #include <filesystem>
 #define _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING
@@ -117,7 +117,7 @@ void process_folder( string dir_name, string filter, bool recursively, string_pa
 			}
 			else
 			{
-				fprintf(stderr, "Failed to allocate memory block of size %i for filename: %s.\n", ent->d_namlen + 1, strerror(errno));
+				fprintf(stderr, "Failed to allocate memory block of size %lld for filename: %s.\n", ent->d_namlen + 1, strerror(errno));
 			}
 		}
 		closedir (dir);
@@ -188,6 +188,8 @@ int _tmain(int argc, _TCHAR* argv[])
 			options.print_string_type = true;
 		else if (lstrcmp(argv[i], L"-s") == 0)
 			options.print_span = true;
+		else if (lstrcmp(argv[i], L"-e") == 0)
+			options.escape_new_lines = true;
 		else if (lstrcmp(argv[i], L"-json") == 0)
 		{
 			options.print_json = true;
@@ -306,7 +308,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	if( flag_help )
 	{
 		// Print help page
-		printf("Strings2 is an improved version of the Sysinternals strings tool that extracts all unicode/ascii strings from binary data. On top of the classical strings approach, this version decodes multilingual strings (eg Chinese, Russian, etc) and uses a ML model to suppress noisy uninteresting strings.\n\n");
+		printf("Strings2 extracts all unicode/ascii strings from binary data. On top of the classical strings approach, this version decodes multilingual strings (eg Chinese, Russian, etc) and uses a ML model to suppress noisy uninteresting strings.\n\n");
 		printf("Example Usage:\n");
 		printf("\tstrings2 malware.exe\n");
 		printf("\tstrings2 *.exe > strings.txt\n");
@@ -321,17 +323,18 @@ int _tmain(int argc, _TCHAR* argv[])
 		printf(" -r\n\tRecursively process subdirectories.\n");
 		printf(" -f\n\tPrints the filename/processname for each string.\n");
 		printf(" -F\n\tPrints the full path and filename for each string.\n");
-		printf(" -s\n\tPrints the span in the buffer for each string.\n");
+		printf(" -s\n\tPrints the file offset or memory address span\n\tof each string.\n");
 		printf(" -t\n\tPrints the string type for each string. UTF8,\n\tor WIDE_STRING.\n");
 		printf(" -wide\n\tPrints only WIDE_STRING strings that are encoded\n\tas two bytes per character.\n");
 		printf(" -utf\n\tPrints only UTF8 encoded strings.\n");
 		printf(" -a\n\tPrints both interesting and not interesting strings.\n\tDefault only prints interesting non-junk strings.\n");
 		printf(" -ni\n\tPrints only not interesting strings. Default only\n\tprints interesting non-junk strings.\n");
+		printf(" -e\n\tEscape new line characters.\n");
 		printf(" -l [numchars]\n\tMinimum number of characters that is a valid string.\n\tDefault is 4.\n");
 		printf(" -b [start](:[end])\n\tScan only the specified byte range for strings\n");
-		printf(" -pid\n\tThe strings from the process address space for the\n\tspecified PID will be dumped. Use a '0x' prefix to\n\tspecify a hex PID.\n");
+		printf(" -pid [pid]\n\tThe strings from the process address space for the\n\tspecified PID will be dumped. Use a '0x' prefix to\n\tspecify a hex PID.\n");
 		printf(" -system\n\tDumps strings from all accessible processes on the\n\tsystem. This takes awhile.\n");
-		printf(" -json\n\tWrites output as json.\n");
+		printf(" -json\n\tWrites output as json. Many flags are ignored in this mode.\n");
 	}else{
 		// Create the string parser object
 		string_parser* parser = new string_parser(options);
@@ -348,7 +351,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			get_privileges( GetCurrentProcess() );
 
 			// Create a process string dump class
-			process_strings* process = new process_strings(parser);
+			memory_strings* process = new memory_strings(parser);
 
 			if( flag_dump_pid )
 			{
@@ -381,7 +384,7 @@ int _tmain(int argc, _TCHAR* argv[])
 						fwprintf(stderr, L"Failed to parse filter argument as a valid PID: %s.\n", filter);
 					}
 				}else{
-					fwprintf(stderr, L"Error. No PID was specified. Example usage:\n\tstrings2 -pid 419 > process_strings.txt\n", filter);
+					fwprintf(stderr, L"Error. No PID was specified. Example usage:\n\tstrings2 -pid 419 > process_strings.txt\n");
 				}
 			}else if( flag_dump_system )
 			{
@@ -406,7 +409,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				fclose(fh);
 			}else{
 				// Error
-				fprintf(stderr, "Invalid stream: %s.\n", "Error opening the piped input: %s.\n", strerror(errno));
+				fprintf(stderr, "Invalid stream. Error opening the piped input: %s.\n", strerror(errno));
 			}
 		}else if(filter != NULL)
 		{

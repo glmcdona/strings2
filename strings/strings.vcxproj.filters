@@ -24,7 +24,7 @@
     <ClCompile Include="print_buffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="process_strings.cpp">
+    <ClCompile Include="memory_strings.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="stdafx.cpp">
@@ -56,7 +56,7 @@
     <ClInclude Include="print_buffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="process_strings.h">
+    <ClInclude Include="memory_strings.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="stdafx.h">

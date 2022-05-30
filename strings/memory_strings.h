@@ -14,15 +14,15 @@ using namespace std;
 
 struct MBI_BASIC_INFO
 {
-	__int64 base;
-	__int64 end;
+	unsigned __int64 base;
+	unsigned __int64 end;
 	DWORD protect;
 	bool valid;
 	bool executable;
-	__int64 size;
+	unsigned __int64 size;
 };
 
-class process_strings
+class memory_strings
 {
 	vector<module> m_modules;
 	string_parser* m_parser;
@@ -31,9 +31,9 @@ class process_strings
 	bool _process_all_memory(HANDLE ph, string process_name);
 	MBI_BASIC_INFO _get_mbi_info(unsigned __int64 address, HANDLE ph);
 public:
-	process_strings(string_parser* parser);
+	memory_strings(string_parser* parser);
 	bool dump_process(DWORD pid);
 	bool dump_system();
 
-	~process_strings(void);
+	~memory_strings(void);
 };
